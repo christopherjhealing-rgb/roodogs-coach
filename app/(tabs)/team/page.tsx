@@ -3,9 +3,21 @@
 import { useEffect, useState } from "react";
 import { newId, storage } from "@/lib/storage";
 import type { Player } from "@/lib/types";
+import FormationView from "./FormationView";
 import PlayerForm, { type PlayerFormData } from "./PlayerForm";
 
 const UNIT_LABEL = { forwards: "Forwards", backs: "Backs" } as const;
+
+/** Manual order first; otherwise jersey number, then name. */
+function rosterCompare(a: Player, b: Player): number {
+  if (a.order != null && b.order != null) return a.order - b.order;
+  if (a.order != null) return -1;
+  if (b.order != null) return 1;
+  const aj = a.jersey ?? 999;
+  const bj = b.jersey ?? 999;
+  if (aj !== bj) return aj - bj;
+  return a.name.localeCompare(b.name);
+}
 
 export default function TeamPage() {
   const [players, setPlayers] = useState<Player[]>([]);
@@ -13,6 +25,7 @@ export default function TeamPage() {
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
+  const [view, setView] = useState<"list" | "formation">("list");
 
   // localStorage isn't there during server render, so read after mount.
   useEffect(() => {
@@ -40,12 +53,24 @@ export default function TeamPage() {
     setEditingId(null);
   }
 
-  const roster = players
-    .filter((p) => p.active)
-    .sort((a, b) => a.name.localeCompare(b.name));
+  const roster = players.filter((p) => p.active).sort(rosterCompare);
   const archived = players
     .filter((p) => !p.active)
     .sort((a, b) => a.name.localeCompare(b.name));
+
+  /** Move a roster card up/down, materialising the manual order. */
+  function movePlayer(index: number, delta: -1 | 1) {
+    const target = index + delta;
+    if (target < 0 || target >= roster.length) return;
+    const ids = roster.map((p) => p.id);
+    [ids[index], ids[target]] = [ids[target], ids[index]];
+    const orderOf = new Map(ids.map((id, i) => [id, i]));
+    save(
+      players.map((p) =>
+        orderOf.has(p.id) ? { ...p, order: orderOf.get(p.id) } : p
+      )
+    );
+  }
 
   return (
     <div className="flex flex-col gap-4 px-4 pt-6">
@@ -59,17 +84,34 @@ export default function TeamPage() {
             </p>
           )}
         </div>
-        {!adding && (
-          <button
-            onClick={() => {
-              setAdding(true);
-              setEditingId(null);
-            }}
-            className="min-h-[48px] rounded-lg bg-pitch px-4 font-semibold text-white"
-          >
-            + Add player
-          </button>
-        )}
+        <div className="flex shrink-0 gap-2">
+          {loaded && roster.length > 0 && (
+            <button
+              onClick={() =>
+                setView((v) => (v === "list" ? "formation" : "list"))
+              }
+              aria-pressed={view === "formation"}
+              className={`min-h-[48px] rounded-lg border px-3 font-semibold ${
+                view === "formation"
+                  ? "border-pitch bg-pitch text-white"
+                  : "border-stone-300 bg-white text-stone-600"
+              }`}
+            >
+              Team shape
+            </button>
+          )}
+          {!adding && (
+            <button
+              onClick={() => {
+                setAdding(true);
+                setEditingId(null);
+              }}
+              className="min-h-[48px] rounded-lg bg-pitch px-4 font-semibold text-white"
+            >
+              + Add player
+            </button>
+          )}
+        </div>
       </header>
 
       {adding && (
@@ -102,8 +144,18 @@ export default function TeamPage() {
         </div>
       )}
 
-      <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {roster.map((player) =>
+      {view === "formation" && roster.length > 0 && (
+        <section className="w-full max-w-3xl rounded-xl border border-stone-200 bg-white p-4 shadow-sm">
+          <FormationView roster={roster} />
+        </section>
+      )}
+
+      <ul
+        className={`grid gap-3 sm:grid-cols-2 xl:grid-cols-3 ${
+          view === "formation" ? "hidden" : ""
+        }`}
+      >
+        {roster.map((player, index) =>
           editingId === player.id ? (
             <li
               key={player.id}
@@ -126,13 +178,16 @@ export default function TeamPage() {
               />
             </li>
           ) : (
-            <li key={player.id}>
+            <li
+              key={player.id}
+              className="flex items-stretch overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm"
+            >
               <button
                 onClick={() => {
                   setEditingId(player.id);
                   setAdding(false);
                 }}
-                className="flex min-h-[56px] w-full items-center justify-between gap-3 rounded-xl border border-stone-200 bg-white px-4 py-3 text-left shadow-sm active:bg-stone-50"
+                className="flex min-h-[56px] min-w-0 flex-1 items-center justify-between gap-3 px-4 py-3 text-left active:bg-stone-50"
               >
                 <span className="flex min-w-0 items-center gap-3">
                   {player.jersey != null && (
@@ -156,10 +211,25 @@ export default function TeamPage() {
                     )}
                   </span>
                 </span>
-                <span className="text-stone-400" aria-hidden>
-                  ›
-                </span>
               </button>
+              <span className="flex shrink-0 flex-col border-l border-stone-100">
+                <button
+                  onClick={() => movePlayer(index, -1)}
+                  disabled={index === 0}
+                  aria-label={`Move ${player.name} up`}
+                  className="min-h-[28px] flex-1 px-2.5 text-sm text-stone-400 hover:text-pitch disabled:opacity-30"
+                >
+                  ▲
+                </button>
+                <button
+                  onClick={() => movePlayer(index, 1)}
+                  disabled={index === roster.length - 1}
+                  aria-label={`Move ${player.name} down`}
+                  className="min-h-[28px] flex-1 border-t border-stone-100 px-2.5 text-sm text-stone-400 hover:text-pitch disabled:opacity-30"
+                >
+                  ▼
+                </button>
+              </span>
             </li>
           )
         )}

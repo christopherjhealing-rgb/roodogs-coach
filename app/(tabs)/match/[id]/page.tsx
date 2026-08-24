@@ -211,7 +211,17 @@ export default function MatchDetailPage() {
     doSwap(onId, benchId);
   }
 
-  function recordStat(playerId: string, type: "try" | "tackle") {
+  const STAT_LABEL = {
+    try: "Try",
+    tackle: "Tackle",
+    steal: "Steal",
+    lost: "Ball lost",
+  } as const;
+
+  function recordStat(
+    playerId: string,
+    type: "try" | "tackle" | "steal" | "lost"
+  ) {
     const e: MatchEvent = {
       id: newId(),
       matchId,
@@ -221,7 +231,7 @@ export default function MatchDetailPage() {
     };
     saveEvents([...events, e]);
     showToast(
-      `${type === "try" ? "Try" : "Tackle"} — ${byId.get(playerId)?.name ?? "?"}!`,
+      `${STAT_LABEL[type]} — ${byId.get(playerId)?.name ?? "?"}${type === "lost" ? "" : "!"}`,
       [e.id]
     );
   }
@@ -395,18 +405,30 @@ export default function MatchDetailPage() {
                         {formatClock(t)}
                       </span>
                     </button>
-                    <div className="flex gap-1.5 pt-1">
+                    <div className="grid grid-cols-2 gap-1.5 pt-1">
                       <button
                         onClick={() => recordStat(p.id, "try")}
-                        className="min-h-[48px] flex-1 rounded-lg bg-emerald-600 text-sm font-bold text-white"
+                        className="min-h-[48px] rounded-lg bg-emerald-600 text-sm font-bold text-white"
                       >
                         Try
                       </button>
                       <button
                         onClick={() => recordStat(p.id, "tackle")}
-                        className="min-h-[48px] flex-1 rounded-lg bg-sky-600 text-sm font-bold text-white"
+                        className="min-h-[48px] rounded-lg bg-sky-600 text-sm font-bold text-white"
                       >
                         Tackle
+                      </button>
+                      <button
+                        onClick={() => recordStat(p.id, "steal")}
+                        className="min-h-[44px] rounded-lg bg-violet-600 text-xs font-bold text-white"
+                      >
+                        Steal
+                      </button>
+                      <button
+                        onClick={() => recordStat(p.id, "lost")}
+                        className="min-h-[44px] rounded-lg border border-stone-300 bg-white text-xs font-semibold text-stone-500"
+                      >
+                        Lost
                       </button>
                     </div>
                   </div>
@@ -519,6 +541,8 @@ export default function MatchDetailPage() {
                 <th className="py-2 text-right font-semibold">Time</th>
                 <th className="py-2 text-right font-semibold">Tries</th>
                 <th className="py-2 text-right font-semibold">Tackles</th>
+                <th className="py-2 text-right font-semibold">Steals</th>
+                <th className="py-2 text-right font-semibold">Lost</th>
               </tr>
             </thead>
             <tbody>
@@ -539,6 +563,12 @@ export default function MatchDetailPage() {
                     </td>
                     <td className="py-2 text-right tabular-nums">
                       {countEvents(events, p.id, "tackle") || "–"}
+                    </td>
+                    <td className="py-2 text-right tabular-nums">
+                      {countEvents(events, p.id, "steal") || "–"}
+                    </td>
+                    <td className="py-2 text-right tabular-nums">
+                      {countEvents(events, p.id, "lost") || "–"}
                     </td>
                   </tr>
                 ))}

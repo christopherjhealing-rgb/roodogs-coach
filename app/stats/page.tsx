@@ -17,6 +17,8 @@ interface PlayerSeason {
   timeMs: number;
   tries: number;
   tackles: number;
+  steals: number;
+  lost: number;
   trainings: number;
   potm: number;
 }
@@ -74,6 +76,8 @@ export default function StatsPage() {
           timeMs: 0,
           tries: 0,
           tackles: 0,
+          steals: 0,
+          lost: 0,
           trainings: 0,
           potm: 0,
         },
@@ -96,6 +100,8 @@ export default function StatsPage() {
         }
         row.tries += countEvents(events, row.id, "try");
         row.tackles += countEvents(events, row.id, "tackle");
+        row.steals += countEvents(events, row.id, "steal");
+        row.lost += countEvents(events, row.id, "lost");
         if (match.playerOfMatchId === row.id) row.potm += 1;
       }
     }
@@ -131,13 +137,13 @@ export default function StatsPage() {
     .sort((a, b) => b.badges.length - a.badges.length);
 
   async function exportCsv() {
-    const header = "Player,Games,Minutes,Tries,Tackles,Trainings\n";
+    const header = "Player,Games,Minutes,Tries,Tackles,Steals,BallsLost,Trainings\n";
     const body = rows
       .map(
         (r) =>
           `"${r.name.replace(/"/g, '""')}",${r.games},${Math.round(
             r.timeMs / 60000
-          )},${r.tries},${r.tackles},${r.trainings}`
+          )},${r.tries},${r.tackles},${r.steals},${r.lost},${r.trainings}`
       )
       .join("\n");
     const blob = new Blob([header + body + "\n"], { type: "text/csv" });
@@ -236,6 +242,8 @@ export default function StatsPage() {
                   <th className="py-2 text-right font-semibold">Time</th>
                   <th className="py-2 text-right font-semibold">Tries</th>
                   <th className="py-2 text-right font-semibold">Tackles</th>
+                  <th className="py-2 text-right font-semibold">Steals</th>
+                  <th className="py-2 text-right font-semibold">Lost</th>
                   <th className="py-2 text-right font-semibold">Training</th>
                 </tr>
               </thead>
@@ -252,6 +260,12 @@ export default function StatsPage() {
                     </td>
                     <td className="py-2 text-right tabular-nums">
                       {r.tackles || "–"}
+                    </td>
+                    <td className="py-2 text-right tabular-nums">
+                      {r.steals || "–"}
+                    </td>
+                    <td className="py-2 text-right tabular-nums">
+                      {r.lost || "–"}
                     </td>
                     <td className="py-2 text-right tabular-nums">
                       {r.trainings || "–"}

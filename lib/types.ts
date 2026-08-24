@@ -24,6 +24,8 @@ export interface Player {
   position?: string;
   /** Forwards or backs. */
   unit?: PlayerUnit;
+  /** Manual roster position; unset players sort by jersey then name. */
+  order?: number;
   /** Soft delete: archived players keep their history but leave the roster. */
   active: boolean;
 }
@@ -77,7 +79,15 @@ export interface Match {
   playerOfMatchId?: string;
 }
 
-export type MatchEventType = "sub_on" | "sub_off" | "try" | "tackle";
+export type MatchEventType =
+  | "sub_on"
+  | "sub_off"
+  | "try"
+  | "tackle"
+  /** Won a turnover / stole the ball. */
+  | "steal"
+  /** Lost the ball (knock-on, stripped, forward pass). */
+  | "lost";
 
 /** What a whiteboard diagram is for. */
 export type BoardKind = "drill" | "game" | "set_play";
