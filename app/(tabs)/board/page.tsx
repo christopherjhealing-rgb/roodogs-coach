@@ -131,7 +131,7 @@ export default function BoardListPage() {
             e.preventDefault();
             createBoard();
           }}
-          className="flex flex-col gap-3 rounded-xl border border-stone-200 bg-white p-4 shadow-sm"
+          className="flex w-full max-w-2xl flex-col gap-3 rounded-xl border border-stone-200 bg-white p-4 shadow-sm"
         >
           <h2 className="font-semibold">New board</h2>
           <label className="flex flex-col gap-1 text-sm font-medium">
@@ -201,7 +201,7 @@ export default function BoardListPage() {
         </div>
       )}
 
-      <ul className="grid grid-cols-2 gap-3">
+      <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
         {visible.map((board) => (
           <li
             key={board.id}

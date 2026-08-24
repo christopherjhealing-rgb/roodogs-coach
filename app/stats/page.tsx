@@ -163,7 +163,7 @@ export default function StatsPage() {
   }
 
   return (
-    <div className="flex flex-col gap-4 px-4 pt-4">
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 pt-4">
       <header className="flex items-end justify-between gap-2">
         <div>
           <Link href="/match" className="min-h-[44px] py-2 text-sm text-stone-500">

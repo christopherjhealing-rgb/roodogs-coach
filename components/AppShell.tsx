@@ -20,7 +20,7 @@ export default function AppShell({
       <div className="flex min-h-dvh min-w-0 flex-1 flex-col">
         <main
           className={`flex-1 pb-24 md:pb-8 ${
-            isBoardEditor ? "" : "mx-auto w-full max-w-3xl"
+            isBoardEditor ? "" : "mx-auto w-full max-w-6xl"
           }`}
         >
           {children}

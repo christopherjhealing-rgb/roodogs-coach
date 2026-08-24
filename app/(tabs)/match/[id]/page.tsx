@@ -229,7 +229,7 @@ export default function MatchDetailPage() {
   const ourTries = events.filter((e) => e.type === "try").length;
 
   return (
-    <div className="flex flex-col gap-4 px-4 pt-4">
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 px-4 pt-4">
       <header className="flex items-center justify-between">
         <Link href="/match" className="min-h-[44px] py-2 text-sm text-stone-500">
           ‹ Matches

@@ -106,7 +106,7 @@ export default function DrillsPage() {
       </div>
 
       {adding && (
-        <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm">
+        <div className="w-full max-w-2xl rounded-xl border border-stone-200 bg-white p-4 shadow-sm">
           <h2 className="mb-3 font-semibold">New drill</h2>
           <DrillForm
             boards={boards}
@@ -128,7 +128,7 @@ export default function DrillsPage() {
         </div>
       )}
 
-      <ul className="grid gap-2 sm:grid-cols-2">
+      <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {visible.map((drill) => {
           const board = drill.boardId
             ? boards.find((b) => b.id === drill.boardId)

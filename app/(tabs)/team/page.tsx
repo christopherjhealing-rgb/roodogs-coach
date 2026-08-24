@@ -73,7 +73,7 @@ export default function TeamPage() {
       </header>
 
       {adding && (
-        <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm">
+        <div className="w-full max-w-2xl rounded-xl border border-stone-200 bg-white p-4 shadow-sm">
           <h2 className="mb-3 font-semibold">New player</h2>
           <PlayerForm
             submitLabel="Add to roster"
@@ -102,7 +102,7 @@ export default function TeamPage() {
         </div>
       )}
 
-      <ul className="grid gap-2 sm:grid-cols-2">
+      <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {roster.map((player) =>
           editingId === player.id ? (
             <li
