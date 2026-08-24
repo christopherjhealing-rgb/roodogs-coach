@@ -8,7 +8,8 @@ export function assignMovements(board: Board) {
   const out: { tokenId: string; movement: Board["movements"][number] }[] = [];
   const used = new Set<string>();
   for (const m of board.movements) {
-    if (m.points.length < 2) continue;
+    // freehand pen strokes are annotations, not a token's path — skip them
+    if (m.points.length < 2 || m.type === "draw") continue;
     let best: string | null = null;
     let bestD = Infinity;
     for (const t of board.tokens) {
@@ -31,7 +32,10 @@ const easeInOut = (x: number) =>
   x < 0.5 ? 2 * x * x : 1 - (-2 * x + 2) ** 2 / 2;
 
 export function canPlay(board: Board): boolean {
-  return board.movements.some((m) => m.points.length >= 2);
+  // a board of only pen scribbles has nothing to animate
+  return board.movements.some(
+    (m) => m.points.length >= 2 && m.type !== "draw"
+  );
 }
 
 /**

@@ -22,6 +22,7 @@ export const MOVEMENT_STYLE: Record<
   kick: { color: "#7dd3fc", dash: "1 2.2", label: "Kick" },
   tackle: { color: "#fb7185", label: "Tackle" },
   jump: { color: "#c4b5fd", dash: "3 2", label: "Jump" },
+  draw: { color: "#fdba74", label: "Pen" },
 };
 
 export const TOKEN_LABELS: Record<TokenType, string> = {
@@ -333,7 +334,8 @@ export function MovementGlyph({
         strokeLinecap="round"
         pointerEvents="none"
       />
-      {movement.type === "tackle" ? (
+      {/* the freehand pen is a plain line — no arrowhead or tackle T-bar */}
+      {movement.type === "draw" ? null : movement.type === "tackle" ? (
         // a tackle ends in a T-bar, not an arrowhead
         <line
           x1={end.x - 2.2 * Math.sin(angle)}

@@ -28,7 +28,7 @@ import {
   snapToGrid,
   surfaceFor,
 } from "../BoardCanvas";
-import { runSequentialPlay } from "../boardPlay";
+import { canPlay, runSequentialPlay } from "../boardPlay";
 
 type Mode =
   | { kind: "move" }
@@ -79,6 +79,7 @@ const MOVEMENT_TYPES: MovementType[] = [
   "kick",
   "tackle",
   "jump",
+  "draw",
 ];
 
 const PLAYER_NUMBERS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
@@ -482,9 +483,11 @@ export default function BoardEditorPage() {
         ],
       }));
     } else if (mode.kind === "draw") {
-      // with grid lock on, arrows start on a grid intersection
+      // with grid lock on, arrows start on a grid intersection — but the
+      // freehand pen is never grid-locked
+      const gridArrow = snap && mode.movement !== "draw";
       drawPoints.current = [
-        snap
+        gridArrow
           ? { x: snapToGrid(p.x, snapStep), y: snapToGrid(p.y, snapStep) }
           : p,
       ];
@@ -562,7 +565,7 @@ export default function BoardEditorPage() {
       });
     } else if (drawPoints.current.length > 0 && mode.kind === "draw") {
       const pts = drawPoints.current;
-      if (snap) {
+      if (snap && mode.movement !== "draw") {
         // grid lock: straight arrow locked to the 8 compass directions
         setPreview({
           id: "preview",
@@ -571,7 +574,7 @@ export default function BoardEditorPage() {
         });
       } else {
         const last = pts[pts.length - 1];
-        // sample the path so curved drags become curved arrows
+        // sample the path so curved drags become curved arrows / pen strokes
         if (Math.hypot(p.x - last.x, p.y - last.y) >= 3) pts.push(p);
         setPreview({
           id: "preview",
@@ -633,7 +636,8 @@ export default function BoardEditorPage() {
       let pts = [...drawPoints.current];
       drawPoints.current = [];
       setPreview(null);
-      if (snap) {
+      const gridArrow = snap && mode.movement !== "draw";
+      if (gridArrow) {
         // grid lock: straight, 8-way, grid-length arrow
         const end = eightWaySnap(pts[0], p, stepU);
         pts = [pts[0], end];
@@ -643,7 +647,7 @@ export default function BoardEditorPage() {
         if (Math.hypot(p.x - last.x, p.y - last.y) >= 1) pts.push(p);
       }
       const length = pathLengthUnits(pts);
-      if (length >= (snap ? 1 : 4)) {
+      if (length >= (gridArrow ? 1 : 4)) {
         commit((b) => ({
           movements: [
             ...b.movements,
@@ -797,19 +801,35 @@ export default function BoardEditorPage() {
           className={toolChip(mode.kind === "draw" && mode.movement === m)}
         >
           <svg viewBox="0 0 24 12" className="h-5 w-6 rounded bg-pitch-dark">
-            <line
-              x1={3}
-              y1={6}
-              x2={17}
-              y2={6}
-              stroke={MOVEMENT_STYLE[m].color}
-              strokeWidth={2}
-              strokeDasharray={MOVEMENT_STYLE[m].dash
-                ?.split(" ")
-                .map((n) => Number(n) * 1.8)
-                .join(" ")}
-            />
-            <polygon points="21,6 16,3.5 16,8.5" fill={MOVEMENT_STYLE[m].color} />
+            {m === "draw" ? (
+              // freehand squiggle, no arrowhead
+              <path
+                d="M3 8 Q7 2 11 7 T19 6"
+                fill="none"
+                stroke={MOVEMENT_STYLE[m].color}
+                strokeWidth={2}
+                strokeLinecap="round"
+              />
+            ) : (
+              <>
+                <line
+                  x1={3}
+                  y1={6}
+                  x2={17}
+                  y2={6}
+                  stroke={MOVEMENT_STYLE[m].color}
+                  strokeWidth={2}
+                  strokeDasharray={MOVEMENT_STYLE[m].dash
+                    ?.split(" ")
+                    .map((n) => Number(n) * 1.8)
+                    .join(" ")}
+                />
+                <polygon
+                  points="21,6 16,3.5 16,8.5"
+                  fill={MOVEMENT_STYLE[m].color}
+                />
+              </>
+            )}
           </svg>
           {MOVEMENT_STYLE[m].label}
         </button>
@@ -931,7 +951,9 @@ export default function BoardEditorPage() {
       {mode.kind === "place" &&
         `Tap the pitch to place a ${TOKEN_LABELS[mode.token].toLowerCase()} — or tap an existing icon to move it.`}
       {mode.kind === "draw" &&
-        `Drag on the pitch to draw a ${MOVEMENT_STYLE[mode.movement].label.toLowerCase()} arrow — curve it as you go.`}
+        (mode.movement === "draw"
+          ? "Draw freehand on the pitch — scribble anything you like."
+          : `Drag on the pitch to draw a ${MOVEMENT_STYLE[mode.movement].label.toLowerCase()} arrow — curve it as you go.`)}
       {mode.kind === "measure" &&
         "Drag between two points to mark the distance in metres."}
       {mode.kind === "erase" && "Tap anything to rub it out."}
@@ -946,7 +968,9 @@ export default function BoardEditorPage() {
     const n = selCount(selected);
     if (n > 1) return `${n} items`;
     if (selectedMovement)
-      return `${MOVEMENT_STYLE[selectedMovement.type].label} arrow`;
+      return selectedMovement.type === "draw"
+        ? "Pen line"
+        : `${MOVEMENT_STYLE[selectedMovement.type].label} arrow`;
     if (selected.measures.length === 1) return "Distance marker";
     if (selectedToken) {
       return selectedToken.type === "player"
@@ -1239,9 +1263,10 @@ export default function BoardEditorPage() {
       ))}
       {preview && <MovementGlyph movement={preview} preview />}
       {preview &&
+        preview.type !== "draw" &&
         preview.points.length >= 2 &&
         (() => {
-          // live running distance while the arrow is being drawn
+          // live running distance while the arrow is being drawn (not the pen)
           const lenU = pathLengthUnits(preview.points);
           if (lenU < 2) return null;
           const last = preview.points[preview.points.length - 1];
@@ -1362,7 +1387,7 @@ export default function BoardEditorPage() {
           aria-label="Board name"
           className="min-h-[44px] w-full min-w-0 rounded-lg border border-transparent bg-transparent px-2 font-semibold outline-none focus:border-stone-300"
         />
-        {board.movements.length > 0 && (
+        {canPlay(board) && (
           <button
             onClick={play}
             disabled={playing}

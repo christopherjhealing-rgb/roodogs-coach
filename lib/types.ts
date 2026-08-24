@@ -103,7 +103,14 @@ export type TokenType =
   | "pad"
   | "ball";
 
-export type MovementType = "run" | "pass" | "kick" | "tackle" | "jump";
+export type MovementType =
+  | "run"
+  | "pass"
+  | "kick"
+  | "tackle"
+  | "jump"
+  /** Freehand pen — a plain drawn line with no arrowhead. */
+  | "draw";
 
 /** A thing placed on the whiteboard. Coordinates are in pitch units
  *  (0–100 across, 0–140 down), not pixels. */
