@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { NavIcon } from "./NavIcon";
 import { TABS } from "./navTabs";
 
 export default function BottomNav() {
@@ -21,9 +22,7 @@ export default function BottomNav() {
                 current ? "text-pitch" : "text-stone-500"
               }`}
             >
-              <span className="text-xl leading-none" aria-hidden>
-                {tab.icon}
-              </span>
+              <NavIcon name={tab.icon} className="h-6 w-6" />
               {tab.label}
             </Link>
           );
