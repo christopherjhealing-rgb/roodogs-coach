@@ -261,7 +261,10 @@ export function MovementGlyph({
   const angle = Math.atan2(end.y - arrowFrom.y, end.x - arrowFrom.x);
 
   return (
-    <g opacity={preview ? 0.6 : 1}>
+    <g
+      opacity={preview ? 0.6 : 1}
+      className={onPointerDown ? "board-move" : undefined}
+    >
       {/* fat invisible stroke so the arrow is easy to hit for erase */}
       {onPointerDown && (
         <path
@@ -269,6 +272,7 @@ export function MovementGlyph({
           fill="none"
           stroke="transparent"
           strokeWidth={7}
+          style={{ cursor: "pointer" }}
           onPointerDown={onPointerDown}
         />
       )}

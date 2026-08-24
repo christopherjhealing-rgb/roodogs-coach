@@ -89,6 +89,16 @@ export default function BoardEditorPage() {
   const drawPoints = useRef<{ x: number; y: number }[]>([]);
   const [preview, setPreview] = useState<BoardMovement | null>(null);
 
+  // mouse hover position on the pitch — drives the ghost preview in place
+  // mode (never set for touch, so phones are unaffected)
+  const [hoverPos, setHoverPos] = useState<{ x: number; y: number } | null>(
+    null
+  );
+
+  useEffect(() => {
+    setHoverPos(null);
+  }, [mode]);
+
   // play-animation state: token id → animated position
   const [playing, setPlaying] = useState(false);
   const [animPositions, setAnimPositions] = useState<Map<
@@ -326,6 +336,14 @@ export default function BoardEditorPage() {
   function onCanvasPointerMove(e: React.PointerEvent) {
     if (!board || playing) return;
     const p = toPitch(e);
+    // ghost preview follows the mouse in place mode
+    if (
+      e.pointerType === "mouse" &&
+      mode.kind === "place" &&
+      !dragTokenId.current
+    ) {
+      setHoverPos(p);
+    }
     if (dragTokenId.current) {
       // snapshot once, on the first actual move, so a plain tap-to-select
       // doesn't add an empty undo step
@@ -691,6 +709,48 @@ export default function BoardEditorPage() {
     }
   }
 
+  // ghost preview of the tool being placed, following the mouse — hidden
+  // over an existing icon, where a click would select instead of place
+  let ghost: React.ReactNode = null;
+  if (mode.kind === "place" && hoverPos && !playing) {
+    const overExisting = board.tokens.some(
+      (t) => Math.hypot(t.x - hoverPos.x, t.y - hoverPos.y) <= 6
+    );
+    if (!overExisting) {
+      const gx = snapToGrid(hoverPos.x, snap);
+      const gy = snapToGrid(hoverPos.y, snap);
+      const label =
+        mode.token === "player"
+          ? String(playerNum ?? nextAutoNumber(board.tokens))
+          : undefined;
+      ghost = (
+        <g
+          opacity={0.45}
+          pointerEvents="none"
+          transform={`translate(${gx} ${gy})`}
+        >
+          <TokenGlyph
+            token={{
+              id: "ghost",
+              type: mode.token,
+              x: 0,
+              y: 0,
+              label,
+              color: mode.token === "cone" ? coneColor : undefined,
+            }}
+          />
+        </g>
+      );
+    }
+  }
+
+  const tokenCursor =
+    mode.kind === "erase"
+      ? "pointer"
+      : mode.kind === "move" || mode.kind === "place"
+        ? "grab"
+        : undefined;
+
   const boardContent = (
     <>
       <Pitch variant={surfaceFor(board)} grid={snap} />
@@ -707,24 +767,42 @@ export default function BoardEditorPage() {
         return (
           <g
             key={t.id}
+            className="board-token"
+            style={tokenCursor ? { cursor: tokenCursor } : undefined}
             transform={`translate(${pos.x} ${pos.y})`}
             onPointerDown={(e) => onTokenPointerDown(e, t)}
           >
             {/* generous invisible hit area for cold thumbs */}
             <circle r={6} fill="transparent" />
             <TokenGlyph token={t} />
+            {/* mouse-only hover ring (see globals.css) */}
+            <circle
+              className="hover-ring"
+              r={5.2}
+              fill="none"
+              stroke="#fff"
+              strokeWidth={0.5}
+              strokeDasharray="1.4 1"
+              pointerEvents="none"
+            />
           </g>
         );
       })}
+      {ghost}
       {!playing && selectionOverlay}
     </>
   );
+
+  const canvasCursor =
+    mode.kind === "place" || mode.kind === "draw"
+      ? "cursor-crosshair"
+      : "";
 
   const canvas = landscape ? (
     <svg
       ref={svgRef}
       viewBox={`0 0 ${PITCH_H} ${PITCH_W}`}
-      className="mx-auto touch-none select-none rounded-xl shadow-sm"
+      className={`mx-auto touch-none select-none rounded-xl shadow-sm ${canvasCursor}`}
       style={{
         aspectRatio: `${PITCH_H} / ${PITCH_W}`,
         height: "min(calc(100dvh - 150px), calc((100vw - 300px) * 0.714))",
@@ -732,6 +810,7 @@ export default function BoardEditorPage() {
       onPointerDown={onCanvasPointerDown}
       onPointerMove={onCanvasPointerMove}
       onPointerUp={onCanvasPointerUp}
+      onPointerLeave={() => setHoverPos(null)}
       data-testid="board-canvas"
       data-orientation="landscape"
     >
@@ -741,11 +820,12 @@ export default function BoardEditorPage() {
     <svg
       ref={svgRef}
       viewBox={`0 0 ${PITCH_W} ${PITCH_H}`}
-      className="w-full touch-none select-none rounded-xl shadow-sm"
+      className={`w-full touch-none select-none rounded-xl shadow-sm ${canvasCursor}`}
       style={{ aspectRatio: `${PITCH_W} / ${PITCH_H}` }}
       onPointerDown={onCanvasPointerDown}
       onPointerMove={onCanvasPointerMove}
       onPointerUp={onCanvasPointerUp}
+      onPointerLeave={() => setHoverPos(null)}
       data-testid="board-canvas"
       data-orientation="portrait"
     >
