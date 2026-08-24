@@ -74,6 +74,47 @@ export function NavIcon({
   }
 }
 
+// Board-tool icons, same line style as the nav set.
+export function MoveIcon({ className = "h-5 w-5" }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden
+    >
+      <path d="M12 3v18M3 12h18" />
+      <path d="M12 3l-2.4 2.4M12 3l2.4 2.4" />
+      <path d="M12 21l-2.4-2.4M12 21l2.4-2.4" />
+      <path d="M3 12l2.4-2.4M3 12l2.4 2.4" />
+      <path d="M21 12l-2.4-2.4M21 12l-2.4 2.4" />
+    </svg>
+  );
+}
+
+export function EraseIcon({ className = "h-5 w-5" }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden
+    >
+      <path d="m7 21-4.3-4.3a2 2 0 0 1 0-2.8l9.6-9.6a2 2 0 0 1 2.8 0l4.5 4.5a2 2 0 0 1 0 2.8L13 21" />
+      <path d="M22 21H8" />
+      <path d="m5 12 7 7" />
+    </svg>
+  );
+}
+
 // Standalone rugby-ball logo mark for the sidebar wordmark.
 export function LogoMark({ className = "h-8 w-8" }: { className?: string }) {
   return (

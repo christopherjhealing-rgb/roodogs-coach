@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { EraseIcon, MoveIcon } from "@/components/NavIcon";
 import { newId, storage } from "@/lib/storage";
 import type {
   Board,
@@ -499,7 +500,7 @@ export default function BoardEditorPage() {
         onClick={() => setMode({ kind: "move" })}
         className={toolChip(mode.kind === "move")}
       >
-        <span className="text-base leading-none" aria-hidden>✋</span>
+        <MoveIcon className="h-5 w-5" />
         Move
       </button>
       {TOKEN_TYPES.map((t) => (
@@ -542,7 +543,7 @@ export default function BoardEditorPage() {
         onClick={() => setMode({ kind: "erase" })}
         className={toolChip(mode.kind === "erase")}
       >
-        <span className="text-base leading-none" aria-hidden>🧽</span>
+        <EraseIcon className="h-5 w-5" />
         Erase
       </button>
     </>
