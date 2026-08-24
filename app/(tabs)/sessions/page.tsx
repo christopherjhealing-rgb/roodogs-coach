@@ -54,6 +54,11 @@ export default function SessionsPage() {
     setEditingId(null);
   }
 
+  function deleteSession(session: Session) {
+    if (!window.confirm("Delete this session? This can't be undone.")) return;
+    save(sessions.filter((s) => s.id !== session.id));
+  }
+
   function duplicateSession(session: Session) {
     const copy: Session = {
       id: newId(),
@@ -214,12 +219,20 @@ export default function SessionsPage() {
                     {players.length})
                   </button>
                 </div>
-                <button
-                  onClick={() => duplicateSession(session)}
-                  className="min-h-[44px] rounded-lg px-3 text-sm font-semibold text-pitch"
-                >
-                  Duplicate
-                </button>
+                <div className="flex">
+                  <button
+                    onClick={() => duplicateSession(session)}
+                    className="min-h-[44px] rounded-lg px-3 text-sm font-semibold text-pitch"
+                  >
+                    Duplicate
+                  </button>
+                  <button
+                    onClick={() => deleteSession(session)}
+                    className="min-h-[44px] rounded-lg px-3 text-sm font-medium text-rose-600"
+                  >
+                    Delete
+                  </button>
+                </div>
               </div>
               {rollOpenId === session.id && (
                 <div className="flex flex-wrap gap-1.5 border-t border-stone-100 px-4 py-3">

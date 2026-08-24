@@ -40,6 +40,12 @@ export default function DrillsPage() {
     setEditingId(null);
   }
 
+  function deleteDrill(drill: Drill) {
+    if (!window.confirm(`Delete "${drill.name}"? This can't be undone.`)) return;
+    save(drills.filter((d) => d.id !== drill.id));
+    setEditingId(null);
+  }
+
   const visible = drills
     .filter((d) => filter === "all" || d.tags.includes(filter))
     .sort((a, b) => a.name.localeCompare(b.name));
@@ -134,6 +140,7 @@ export default function DrillsPage() {
                 submitLabel="Save"
                 onSubmit={(data) => updateDrill(drill.id, data)}
                 onCancel={() => setEditingId(null)}
+                onDelete={() => deleteDrill(drill)}
               />
             </li>
           ) : (

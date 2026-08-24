@@ -10,12 +10,14 @@ export default function DrillForm({
   submitLabel,
   onSubmit,
   onCancel,
+  onDelete,
 }: {
   initial?: Drill;
   boards: Board[];
   submitLabel: string;
   onSubmit: (drill: Omit<Drill, "id">) => void;
   onCancel: () => void;
+  onDelete?: () => void;
 }) {
   const [name, setName] = useState(initial?.name ?? "");
   const [tags, setTags] = useState<DrillTag[]>(initial?.tags ?? []);
@@ -180,6 +182,16 @@ export default function DrillForm({
           Cancel
         </button>
       </div>
+
+      {onDelete && (
+        <button
+          type="button"
+          onClick={onDelete}
+          className="min-h-[44px] w-fit self-center rounded-lg px-3 text-sm font-medium text-rose-600"
+        >
+          Delete this drill
+        </button>
+      )}
     </form>
   );
 }

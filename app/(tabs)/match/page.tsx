@@ -88,6 +88,22 @@ export default function MatchListPage() {
     router.push(`/match/${match.id}`);
   }
 
+  function deleteMatch(match: Match) {
+    if (
+      !window.confirm(
+        `Delete the match vs ${match.opponent}? This removes its game-time record too and can't be undone.`
+      )
+    )
+      return;
+    const next = matches.filter((m) => m.id !== match.id);
+    setMatches(next);
+    storage.setMatches(next);
+    // drop the match's events so no orphans linger in storage
+    storage.setMatchEvents(
+      storage.getMatchEvents().filter((e) => e.matchId !== match.id)
+    );
+  }
+
   const sorted = [...matches].sort((a, b) => b.date.localeCompare(a.date));
 
   return (
@@ -232,10 +248,13 @@ export default function MatchListPage() {
         {sorted.map((match) => {
           const badge = STATUS_BADGE[match.status];
           return (
-            <li key={match.id}>
+            <li
+              key={match.id}
+              className="overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm"
+            >
               <Link
                 href={`/match/${match.id}`}
-                className="flex min-h-[56px] items-center justify-between gap-3 rounded-xl border border-stone-200 bg-white px-4 py-3 shadow-sm active:bg-stone-50"
+                className="flex min-h-[56px] items-center justify-between gap-3 px-4 py-3 active:bg-stone-50"
               >
                 <span className="min-w-0">
                   <span className="block font-semibold">
@@ -252,6 +271,14 @@ export default function MatchListPage() {
                   {badge.label}
                 </span>
               </Link>
+              <div className="flex justify-end border-t border-stone-100 px-2">
+                <button
+                  onClick={() => deleteMatch(match)}
+                  className="min-h-[44px] px-3 text-xs font-medium text-rose-600"
+                >
+                  Delete
+                </button>
+              </div>
             </li>
           );
         })}
