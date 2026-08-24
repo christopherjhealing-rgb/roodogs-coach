@@ -22,6 +22,17 @@ function formatDate(iso: string): string {
   });
 }
 
+/** The coming Saturday in local time (today if it's already Saturday) —
+ *  junior games are played Saturday mornings. */
+function nextSaturdayISO(): string {
+  const d = new Date();
+  d.setDate(d.getDate() + ((6 - d.getDay() + 7) % 7));
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 export default function MatchListPage() {
   const router = useRouter();
   const [matches, setMatches] = useState<Match[]>([]);
@@ -31,20 +42,21 @@ export default function MatchListPage() {
 
   const [opponent, setOpponent] = useState("");
   const [date, setDate] = useState("");
-  const [halfLength, setHalfLength] = useState("15");
+  const [halfLength, setHalfLength] = useState("20");
   const [squadIds, setSquadIds] = useState<string[]>([]);
 
   useEffect(() => {
     setMatches(storage.getMatches());
     setPlayers(storage.getPlayers().filter((p) => p.active));
-    setDate(new Date().toISOString().slice(0, 10));
+    setDate(nextSaturdayISO());
     setLoaded(true);
   }, []);
 
   function openCreate() {
     setSquadIds(players.map((p) => p.id));
     setOpponent("");
-    setHalfLength("15");
+    setHalfLength("20");
+    setDate(nextSaturdayISO());
     setCreating(true);
   }
 

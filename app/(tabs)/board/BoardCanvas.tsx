@@ -121,14 +121,10 @@ export function TokenGlyph({ token }: { token: BoardToken }) {
         </g>
       );
     case "cone": {
+      // flat spot-marker: a small filled disc in its colour
       const fill = token.color ?? "#fb923c";
       return (
-        <polygon
-          points="0,-2.8 2.5,2.1 -2.5,2.1"
-          fill={fill}
-          stroke={coneStroke(fill)}
-          strokeWidth={0.4}
-        />
+        <circle r={2.3} fill={fill} stroke={coneStroke(fill)} strokeWidth={0.5} />
       );
     }
     case "hurdle":
