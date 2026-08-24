@@ -64,6 +64,34 @@ describe("mergeSnapshots — per-collection last-write-wins", () => {
     expect(changedLocal).toBe(true);
   });
 
+  it("a fresh device pulls pre-sync data that has no timestamp (0-vs-0 tie)", () => {
+    // The real bug: a computer's roster entered before sync existed has u=0;
+    // a fresh phone's roster is empty at u=0. The populated side must win.
+    const phone = {} as Snapshot; // never written — all empty at u=0
+    const cloud = snap({
+      [KEYS.players]: { u: 0, d: [{ id: "a" }, { id: "b" }] },
+    });
+    const { merged, changedLocal } = mergeSnapshots(phone, cloud);
+    expect(merged[KEYS.players].d).toEqual([{ id: "a" }, { id: "b" }]);
+    expect(changedLocal).toBe(true);
+  });
+
+  it("pushes pre-sync data up over an empty store at the same u=0", () => {
+    const local = snap({ [KEYS.players]: { u: 0, d: [{ id: "a" }] } });
+    const cloud = snap({ [KEYS.players]: { u: 0, d: [] } });
+    const { merged, changedRemote } = mergeSnapshots(local, cloud);
+    expect(merged[KEYS.players].d).toEqual([{ id: "a" }]);
+    expect(changedRemote).toBe(true);
+  });
+
+  it("does not resurrect a genuine delete: newer empty beats older populated", () => {
+    const stale = snap({ [KEYS.players]: { u: 100, d: [{ id: "a" }] } });
+    const deleted = snap({ [KEYS.players]: { u: 200, d: [] } }); // deleted later
+    const { merged, changedLocal } = mergeSnapshots(stale, deleted);
+    expect(merged[KEYS.players].d).toEqual([]);
+    expect(changedLocal).toBe(true);
+  });
+
   it("treats equal timestamps as no change", () => {
     const a = snap({ [KEYS.players]: { u: 42, d: [{ id: "a" }] } });
     const b = snap({ [KEYS.players]: { u: 42, d: [{ id: "a" }] } });

@@ -31,6 +31,13 @@ function defaultFor(key: string): unknown {
   return key === KEYS.formation ? {} : [];
 }
 
+/** True for an empty collection — [] or {} — i.e. "no data here". */
+function isEmpty(d: unknown): boolean {
+  if (Array.isArray(d)) return d.length === 0;
+  if (d && typeof d === "object") return Object.keys(d).length === 0;
+  return d == null;
+}
+
 /** Gather every synced collection out of local storage into a snapshot. */
 export function localSnapshot(): Snapshot {
   const updated = read<Record<string, number>>(KEYS.updated, {});
@@ -42,7 +49,30 @@ export function localSnapshot(): Snapshot {
 }
 
 /**
+ * One-time migration: data entered before sync existed carries no change time
+ * (timestamp 0). Stamp any populated collection that lacks one with a tiny
+ * baseline (1ms past the epoch) so it participates in sync — it beats a device
+ * that has never written that collection (0) and loses to any real later edit.
+ * Without this, a computer's pre-sync roster would tie 0-vs-0 with a fresh
+ * phone's blank roster.
+ */
+export function migrateLegacyStamps(): void {
+  const updated = read<Record<string, number>>(KEYS.updated, {});
+  let changed = false;
+  for (const k of SYNCED_KEYS) {
+    const data = read<unknown>(k, defaultFor(k));
+    if (!isEmpty(data) && !(updated[k] > 0)) {
+      updated[k] = 1;
+      changed = true;
+    }
+  }
+  if (changed) writeRaw(KEYS.updated, updated);
+}
+
+/**
  * Merge local and remote snapshots, collection by collection, newest wins.
+ * On an exact timestamp tie, a populated collection beats an empty one, so
+ * pre-sync data (timestamp 0) is never lost to a fresh device's blank slate.
  * `changedLocal` — the merge pulled in newer remote data we should apply here.
  * `changedRemote` — we hold newer data the server doesn't have yet, so push.
  */
@@ -56,15 +86,20 @@ export function mergeSnapshots(
   for (const k of SYNCED_KEYS) {
     const l = local[k] ?? { u: 0, d: defaultFor(k) };
     const r = remote?.[k];
-    if (r && r.u > l.u) {
-      merged[k] = r;
+    const takeRemote =
+      !!r &&
+      (r.u > l.u || (r.u === l.u && isEmpty(l.d) && !isEmpty(r.d)));
+    if (takeRemote) {
+      merged[k] = r as Coll;
       changedLocal = true;
     } else {
       merged[k] = l;
-      // We hold newer data than the server for a collection we've actually
-      // written (u > 0) — worth pushing. An untouched collection (u === 0)
-      // never triggers a push on its own.
-      if (l.u > 0 && (!r || l.u > r.u)) changedRemote = true;
+      // Push up when we hold data the server lacks or is behind on: a newer
+      // stamp, no remote at all, or a tie where the server's copy is empty and
+      // ours isn't. Never push an empty collection on its own.
+      const serverBehind =
+        !r || l.u > r.u || (r.u === l.u && !isEmpty(l.d) && isEmpty(r.d));
+      if (!isEmpty(l.d) && serverBehind) changedRemote = true;
     }
   }
   return { merged, changedLocal, changedRemote };

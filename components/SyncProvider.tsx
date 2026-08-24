@@ -7,6 +7,7 @@ import {
   applySnapshot,
   localSnapshot,
   mergeSnapshots,
+  migrateLegacyStamps,
   onDataChanged,
   pullRemote,
   pushRemote,
@@ -66,6 +67,10 @@ export default function SyncProvider({
 
   useEffect(() => {
     let cancelled = false;
+
+    // Give any data entered before sync existed a baseline timestamp, so it
+    // syncs up to the cloud instead of tying 0-vs-0 with a blank device.
+    migrateLegacyStamps();
 
     async function doPush() {
       let snap = localSnapshot();
