@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { newId, storage } from "@/lib/storage";
-import { SEED_DRILLS } from "@/lib/seedDrills";
+import { ensureSeedData } from "@/lib/ensureSeed";
 import type { Board, Drill, Player, Session } from "@/lib/types";
 import PresentMode from "./PresentMode";
 import SessionBuilder from "./SessionBuilder";
@@ -29,14 +29,10 @@ export default function SessionsPage() {
   const [presentingId, setPresentingId] = useState<string | null>(null);
 
   useEffect(() => {
-    // Seed drills here too, so the builder isn't empty if this tab is
-    // opened before the Drills tab ever has been.
-    let storedDrills = storage.getDrills();
-    if (storedDrills.length === 0) {
-      storedDrills = SEED_DRILLS;
-      storage.setDrills(storedDrills);
-    }
-    setDrills(storedDrills);
+    // Seed drills/boards here too, so the builder isn't empty if this tab
+    // is opened before the Drills tab ever has been.
+    ensureSeedData();
+    setDrills(storage.getDrills());
     setSessions(storage.getSessions());
     setPlayers(storage.getPlayers().filter((p) => p.active));
     setBoards(storage.getBoards());

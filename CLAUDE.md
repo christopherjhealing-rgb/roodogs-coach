@@ -45,7 +45,10 @@ Five bottom-nav tabs, components colocated by feature under `app/(tabs)/`:
 
 1. **Team** — roster list, add/edit/archive (soft delete via `active`)
 2. **Drills** — library seeded with 25 U9 drills on first open, tag filter,
-   add/edit (`lib/seedDrills.ts`)
+   add/edit (`lib/seedDrills.ts`). Each seed drill links to a pre-drawn
+   setup diagram (`lib/seedBoards.ts`) shown on its card. `lib/ensureSeed.ts`
+   seeds drills + boards idempotently and links them by naming convention
+   (`seed-x` drill → `seed-board-x` board).
 3. **Sessions** — session builder picking drills to ~60 min with a running
    counter, reorder, duplicate past session. Roll call per session
    (`attendeeIds`) and a fullscreen Present mode that steps through the

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { newId, storage } from "@/lib/storage";
-import { SEED_DRILLS } from "@/lib/seedDrills";
+import { ensureSeedData } from "@/lib/ensureSeed";
 import type { Board, Drill, DrillTag } from "@/lib/types";
 import { BoardPreview } from "../board/BoardCanvas";
 import DrillForm from "./DrillForm";
@@ -17,14 +17,10 @@ export default function DrillsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
 
   // Read after mount (no localStorage on the server); seed the starter
-  // library the first time the tab is opened.
+  // library and its diagram boards the first time the tab is opened.
   useEffect(() => {
-    let stored = storage.getDrills();
-    if (stored.length === 0) {
-      stored = SEED_DRILLS;
-      storage.setDrills(stored);
-    }
-    setDrills(stored);
+    ensureSeedData();
+    setDrills(storage.getDrills());
     setBoards(storage.getBoards());
     setLoaded(true);
   }, []);
@@ -198,7 +194,7 @@ export default function DrillsPage() {
                   return board ? (
                     <BoardPreview
                       board={board}
-                      className="mt-1 w-28 rounded-lg"
+                      className="mt-1 w-32 rounded-lg border border-stone-200"
                     />
                   ) : null;
                 })()}
