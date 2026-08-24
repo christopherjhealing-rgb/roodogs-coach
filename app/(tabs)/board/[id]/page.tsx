@@ -357,6 +357,8 @@ export default function BoardEditorPage() {
       // tap on empty pitch clears the selection
       setSelected(null);
     } else if (mode.kind === "place") {
+      // placing on empty pitch clears any current selection
+      setSelected(null);
       let label: string | undefined;
       if (mode.token === "player") {
         const n = playerNum ?? nextAutoNumber(board.tokens);
@@ -435,9 +437,12 @@ export default function BoardEditorPage() {
 
   function onTokenPointerDown(e: React.PointerEvent, token: BoardToken) {
     if (playing) return;
-    if (mode.kind === "move") {
+    // Tapping an existing icon always selects it (so you can move or delete
+    // it) — in Move mode and in any Place tool. Only Draw lets the tap fall
+    // through, so you can still draw an arrow starting from a player.
+    if (mode.kind === "move" || mode.kind === "place") {
       e.stopPropagation();
-      // select it (so the delete button shows) and arm a drag; the undo
+      // select it (so the delete bar shows) and arm a drag; the undo
       // snapshot is deferred until the token actually moves
       setSelected({ kind: "token", id: token.id });
       dragTokenId.current = token.id;
@@ -447,12 +452,11 @@ export default function BoardEditorPage() {
       e.stopPropagation();
       commit((b) => ({ tokens: b.tokens.filter((t) => t.id !== token.id) }));
     }
-    // in place/draw modes let the event fall through to the canvas
   }
 
   function onMovementPointerDown(e: React.PointerEvent, movement: BoardMovement) {
     if (playing) return;
-    if (mode.kind === "move") {
+    if (mode.kind === "move" || mode.kind === "place") {
       e.stopPropagation();
       setSelected({ kind: "movement", id: movement.id });
     } else if (mode.kind === "erase") {
@@ -594,12 +598,47 @@ export default function BoardEditorPage() {
 
   const hint = (
     <p className="text-center text-xs text-stone-400">
-      {mode.kind === "move" && "Tap to select, drag to move, tap the red × to delete."}
-      {mode.kind === "place" && `Tap the pitch to place a ${TOKEN_LABELS[mode.token].toLowerCase()}.`}
+      {mode.kind === "move" && "Tap any icon to select it, then drag to move or hit Delete."}
+      {mode.kind === "place" && `Tap the pitch to place a ${TOKEN_LABELS[mode.token].toLowerCase()} — or tap an existing icon to move it.`}
       {mode.kind === "draw" && `Drag on the pitch to draw a ${MOVEMENT_STYLE[mode.movement].label.toLowerCase()} arrow — curve it as you go.`}
       {mode.kind === "erase" && "Tap anything to rub it out."}
     </p>
   );
+
+  const selectedLabel = (() => {
+    if (!selected) return "";
+    if (selected.kind === "movement") {
+      const m = board.movements.find((x) => x.id === selected.id);
+      return m ? `${MOVEMENT_STYLE[m.type].label} arrow` : "Arrow";
+    }
+    const t = board.tokens.find((x) => x.id === selected.id);
+    if (!t) return "";
+    return t.type === "player"
+      ? `Player ${t.label ?? ""}`.trim()
+      : TOKEN_LABELS[t.type];
+  })();
+
+  const selectionBar = selected ? (
+    <div className="flex items-center justify-between gap-2 rounded-lg border border-pitch bg-emerald-50 px-3 py-2">
+      <span className="min-w-0 truncate text-sm font-semibold text-pitch">
+        {selectedLabel} selected — drag to move
+      </span>
+      <div className="flex shrink-0 gap-2">
+        <button
+          onClick={deleteSelected}
+          className="min-h-[44px] rounded-lg bg-rose-600 px-3 text-sm font-bold text-white"
+        >
+          🗑 Delete
+        </button>
+        <button
+          onClick={() => setSelected(null)}
+          className="min-h-[44px] rounded-lg border border-stone-300 bg-white px-3 text-sm font-medium text-stone-600"
+        >
+          Done
+        </button>
+      </div>
+    </div>
+  ) : null;
 
   const legend = (
     <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-stone-500">
@@ -796,6 +835,7 @@ export default function BoardEditorPage() {
           <div className="flex w-[240px] shrink-0 flex-col gap-2">
             <div className="flex flex-wrap gap-1.5">{paletteButtons}</div>
             {subOptions}
+            {selectionBar}
             {hint}
             {legend}
             <button
@@ -813,6 +853,7 @@ export default function BoardEditorPage() {
             <div className="flex w-max gap-1.5">{paletteButtons}</div>
           </div>
           {subOptions}
+          {selectionBar}
           {hint}
           {canvas}
           {legend}
