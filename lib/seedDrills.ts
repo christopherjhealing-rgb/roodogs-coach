@@ -278,4 +278,106 @@ export const SEED_DRILLS: Drill[] = [
     easier: "Gentle lobs from close range",
     harder: "Higher balls on the move, calling 'mine' early",
   },
+
+  // — Game-play drills (U10 pathway: 12-a-side, kicking, and scrums &
+  //   lineouts introduced with limited contest and no lifting) —
+  {
+    id: "seed-pick-and-drive",
+    name: "Pick and Drive",
+    tags: ["rucking", "setpiece", "fitness"],
+    durationMins: 10,
+    equipment: "Balls, 2 shields, cones for a channel",
+    description:
+      "Forwards' bread and butter. Ball is presented at the ruck; the next forward picks it off the ground, stays low with a strong grip and drives one or two steps over the gain line, then goes to ground and presents again. The next picks and drives. Keep it square and low — small, powerful steps.",
+    easier: "Walk it through with no shields",
+    harder: "Two soft shields to drive through; add a support latch",
+  },
+  {
+    id: "seed-forward-pods",
+    name: "Forward Pods Up the Field",
+    tags: ["rucking", "fitness", "setpiece"],
+    durationMins: 10,
+    equipment: "Balls, cones marking channels",
+    description:
+      "Three small pods of forwards take turns carrying up a channel. Carry hits the line low and presents long; a teammate clears the shield over the ball, the pod reloads and the next pod goes. Teaches taking turns, low body height and quick ball.",
+    easier: "One pod at a time, walking pace",
+    harder: "Live shield over the ball; beat a 4-second ruck clock",
+  },
+  {
+    id: "seed-catch-pass-line",
+    name: "Catch-Pass Along the Line",
+    tags: ["passing"],
+    durationMins: 8,
+    equipment: "1 ball per group of 5",
+    description:
+      "Backs stand in a flat line a few metres apart. Ball travels hand to hand with early hands — reach for it, catch and pass in one motion, don't run then pass. Pass to the space in front of the next player. Down the line and back.",
+    easier: "Standing still, catch-pass only",
+    harder: "Walk then jog forward as a line; weaker hand back the other way",
+  },
+  {
+    id: "seed-3v2-overload",
+    name: "3 v 2 Draw and Pass",
+    tags: ["passing", "evasion"],
+    durationMins: 10,
+    equipment: "Balls, cones for a wide channel",
+    description:
+      "Three attackers against two defenders. Carry runs straight to fix a defender, then passes; the next does the same to put the outside runner into the gap. It's all about fixing your defender before you pass — celebrate the try-making pass.",
+    easier: "Defenders walk; play it 4 v 2",
+    harder: "Defenders at full speed; shrink the channel",
+  },
+  {
+    id: "seed-switch-play",
+    name: "Switch (Cut) Pass",
+    tags: ["passing", "evasion"],
+    durationMins: 8,
+    equipment: "Balls, cones",
+    description:
+      "Ball carrier angles across; a support runner cuts back underneath onto a short inside pass — changing the point of attack and wrong-footing the defender. Call 'switch!'. Practise both directions.",
+    easier: "Walk the timing through, no defenders",
+    harder: "Add a drifting defender to beat with the switch",
+  },
+  {
+    id: "seed-miss-pass",
+    name: "Miss Pass to the Winger",
+    tags: ["passing"],
+    durationMins: 8,
+    equipment: "1 ball per group of 5, cones",
+    description:
+      "Skip a player with a longer pass to hit the outside back in space. The line runs across; the passer misses the first receiver and throws to the next. Great for moving the ball wide fast when there's an overlap out there.",
+    easier: "Standing, short miss pass",
+    harder: "On the move; call the miss early and hit the winger at pace",
+  },
+  {
+    id: "seed-scrum-setup",
+    name: "Safe Scrum Set-up",
+    tags: ["setpiece"],
+    durationMins: 10,
+    equipment: "None (or a scrum machine if available)",
+    description:
+      "U10 scrums come in with a small push only (about a metre) — safety first. Practise the sequence: feet set, flat back, heads up, bind, then 'crouch — bind — set', a steady gentle push, scrum-half feeds straight and clears. No wheeling and no big shoves. If players aren't ready it stays uncontested.",
+    easier: "Hold the body positions with no push at all",
+    harder: "Add the scrum-half feed and a clean pass away",
+  },
+  {
+    id: "seed-lineout-throw",
+    name: "Lineout: Straight Throw & Jump",
+    tags: ["setpiece"],
+    durationMins: 10,
+    equipment: "Balls, cones to mark the line",
+    description:
+      "U10 lineout — four or five players and no lifting. The thrower throws straight down the middle of the tunnel; the jumper times a jump (feet only, no lifting) to catch above the head and bring it down safely to the scrum-half. Call a simple code for front or middle.",
+    easier: "Throw to a standing catcher, no jump",
+    harder: "Time the jump to a called number, then feed the scrum-half",
+  },
+  {
+    id: "seed-kick-chase",
+    name: "Kick and Chase",
+    tags: ["kicking", "fitness"],
+    durationMins: 8,
+    equipment: "Balls, cones",
+    description:
+      "Kicking comes in at U10. Practise a short grubber or gentle kick into space, then chase in a line — the chaser stays onside (behind the kicker) and puts on pressure. Keep kicks low and into space, not aimlessly downfield.",
+    easier: "Grubber kick and walk-chase to gather",
+    harder: "Chase in a line of three; first to the ball calls 'mine'",
+  },
 ];

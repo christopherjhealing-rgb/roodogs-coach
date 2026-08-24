@@ -1,4 +1,4 @@
-import type { Board, BoardMovement, BoardToken } from "./types";
+import type { Board, BoardKind, BoardMovement, BoardToken } from "./types";
 
 // Pre-drawn setup diagrams, one per seeded drill. Pitch coordinates are
 // 0–100 across by 0–140 down (see BoardCanvas). Ids are stable so the seed
@@ -26,6 +26,7 @@ const BALL = (x: number, y: number): Tk => ({ type: "ball", x, y });
 
 const run = (pts: { x: number; y: number }[]): Mv => ({ type: "run", points: pts });
 const pass = (pts: { x: number; y: number }[]): Mv => ({ type: "pass", points: pts });
+const kick = (pts: { x: number; y: number }[]): Mv => ({ type: "kick", points: pts });
 const tackle = (pts: { x: number; y: number }[]): Mv => ({
   type: "tackle",
   points: pts,
@@ -62,20 +63,25 @@ function channel(
   return out;
 }
 
-function mk(
+function mkKind(
   id: string,
   name: string,
+  kind: BoardKind,
   tokens: Tk[],
   movements: Mv[]
 ): Board {
   return {
     id,
     name,
-    kind: "drill",
+    kind,
     tokens: tokens.map((t, i) => ({ ...t, id: `${id}-t${i}` })),
     movements: movements.map((m, i) => ({ ...m, id: `${id}-m${i}` })),
     updatedMs: 0,
   };
+}
+
+function mk(id: string, name: string, tokens: Tk[], movements: Mv[]): Board {
+  return mkKind(id, name, "drill", tokens, movements);
 }
 
 export const SEED_BOARDS: Board[] = [
@@ -463,6 +469,229 @@ export const SEED_BOARDS: Board[] = [
         { x: 62, y: 72 },
         { x: 62, y: 82 },
       ]),
+    ]
+  ),
+
+  // — Game-play drill diagrams —
+  mk(
+    "seed-board-pick-and-drive",
+    "Pick and Drive — setup",
+    [
+      ...channel(38, 62, 46, 104, 2),
+      BALL(50, 90),
+      BAG(45, 76),
+      BAG(55, 76),
+      P(44, 98, "1"),
+      P(56, 98, "2"),
+      P(50, 106, "3"),
+    ],
+    [run([{ x: 50, y: 90 }, { x: 50, y: 70 }])]
+  ),
+  mk(
+    "seed-board-forward-pods",
+    "Forward Pods — setup",
+    [
+      ...channel(36, 64, 42, 106, 2),
+      BALL(50, 98),
+      BAG(50, 70),
+      P(44, 98, "1"),
+      P(56, 98, "1"),
+      P(44, 108, "2"),
+      P(56, 108, "2"),
+    ],
+    [run([{ x: 50, y: 98 }, { x: 50, y: 76 }])]
+  ),
+  mk(
+    "seed-board-catch-pass-line",
+    "Catch-Pass Line — setup",
+    [
+      P(28, 80, "1"),
+      P(42, 80, "2"),
+      P(56, 80, "3"),
+      P(70, 80, "4"),
+      P(84, 80, "5"),
+      BALL(28, 80),
+    ],
+    [
+      pass([{ x: 30, y: 79 }, { x: 42, y: 79 }]),
+      pass([{ x: 44, y: 79 }, { x: 56, y: 79 }]),
+      pass([{ x: 58, y: 79 }, { x: 70, y: 79 }]),
+      pass([{ x: 72, y: 79 }, { x: 84, y: 79 }]),
+    ]
+  ),
+  mk(
+    "seed-board-3v2-overload",
+    "3 v 2 Draw and Pass — setup",
+    [
+      ...channel(22, 78, 46, 100, 2),
+      P(35, 94, "1"),
+      P(50, 94, "2"),
+      P(65, 94, "3"),
+      O(42, 66),
+      O(60, 66),
+      BALL(35, 94),
+    ],
+    [
+      pass([{ x: 37, y: 92 }, { x: 49, y: 92 }]),
+      pass([{ x: 51, y: 92 }, { x: 64, y: 92 }]),
+      run([{ x: 65, y: 90 }, { x: 71, y: 54 }]),
+    ]
+  ),
+  mk(
+    "seed-board-switch-play",
+    "Switch (Cut) — setup",
+    [P(40, 94, "1"), P(56, 94, "2"), O(50, 64), BALL(40, 94)],
+    [
+      run([{ x: 40, y: 92 }, { x: 55, y: 72 }]),
+      run([{ x: 56, y: 92 }, { x: 45, y: 70 }]),
+      pass([{ x: 52, y: 76 }, { x: 47, y: 74 }]),
+    ]
+  ),
+  mk(
+    "seed-board-miss-pass",
+    "Miss Pass — setup",
+    [
+      P(26, 84, "1"),
+      P(44, 84, "2"),
+      P(62, 84, "3"),
+      P(82, 84, "4"),
+      BALL(26, 84),
+    ],
+    [
+      pass([{ x: 28, y: 82 }, { x: 62, y: 82 }]),
+      pass([{ x: 64, y: 82 }, { x: 82, y: 82 }]),
+      run([{ x: 82, y: 82 }, { x: 86, y: 52 }]),
+    ]
+  ),
+  mk(
+    "seed-board-scrum-setup",
+    "Safe Scrum — setup",
+    [
+      P(44, 68, "1"),
+      P(50, 68, "2"),
+      P(56, 68, "3"),
+      O(44, 60),
+      O(50, 60),
+      O(56, 60),
+      P(37, 74, "9"),
+      BALL(41, 71),
+    ],
+    [pass([{ x: 41, y: 71 }, { x: 32, y: 80 }])]
+  ),
+  mk(
+    "seed-board-lineout-throw",
+    "Lineout Throw & Jump — setup",
+    [
+      P(20, 70, "T"),
+      P(40, 60, "1"),
+      P(52, 60, "2"),
+      P(64, 60, "3"),
+      O(40, 80),
+      O(52, 80),
+      O(64, 80),
+      P(76, 70, "9"),
+      BALL(23, 70),
+    ],
+    [
+      pass([{ x: 25, y: 70 }, { x: 52, y: 63 }]),
+      run([{ x: 52, y: 60 }, { x: 52, y: 54 }]),
+    ]
+  ),
+  mk(
+    "seed-board-kick-chase",
+    "Kick and Chase — setup",
+    [P(40, 98, "1"), P(50, 100, "2"), P(60, 98, "3"), BALL(50, 100)],
+    [
+      kick([{ x: 50, y: 98 }, { x: 52, y: 52 }]),
+      run([{ x: 40, y: 96 }, { x: 46, y: 58 }]),
+      run([{ x: 60, y: 96 }, { x: 56, y: 58 }]),
+    ]
+  ),
+
+  // — Set plays (full pitch) —
+  mkKind(
+    "seed-board-setplay-scrum-backs",
+    "Set play: Scrum → backs cut",
+    "set_play",
+    [
+      P(46, 84, "1"),
+      P(50, 84, "2"),
+      P(54, 84, "3"),
+      O(46, 90),
+      O(50, 90),
+      O(54, 90),
+      P(40, 80, "9"),
+      P(34, 74, "10"),
+      P(28, 64, "12"),
+      P(22, 54, "13"),
+    ],
+    [
+      pass([{ x: 40, y: 80 }, { x: 34, y: 74 }]),
+      pass([{ x: 34, y: 74 }, { x: 28, y: 64 }]),
+      run([{ x: 28, y: 64 }, { x: 20, y: 44 }]),
+      run([{ x: 22, y: 54 }, { x: 34, y: 44 }]),
+    ]
+  ),
+  mkKind(
+    "seed-board-setplay-lineout-drive",
+    "Set play: Lineout → drive",
+    "set_play",
+    [
+      P(14, 60, "T"),
+      P(30, 52, "4"),
+      P(42, 52, "5"),
+      P(54, 52, "6"),
+      O(30, 68),
+      O(42, 68),
+      O(54, 68),
+      P(64, 60, "9"),
+    ],
+    [
+      pass([{ x: 17, y: 60 }, { x: 42, y: 54 }]),
+      run([{ x: 42, y: 54 }, { x: 42, y: 38 }]),
+    ]
+  ),
+  mkKind(
+    "seed-board-setplay-lineout-backs",
+    "Set play: Lineout → backs",
+    "set_play",
+    [
+      P(14, 58, "T"),
+      P(30, 50, "4"),
+      P(42, 50, "5"),
+      P(54, 50, "6"),
+      O(30, 44),
+      O(42, 44),
+      O(54, 44),
+      P(62, 60, "9"),
+      P(54, 72, "10"),
+      P(44, 86, "12"),
+      P(34, 100, "13"),
+    ],
+    [
+      pass([{ x: 17, y: 58 }, { x: 42, y: 52 }]),
+      pass([{ x: 42, y: 54 }, { x: 60, y: 60 }]),
+      pass([{ x: 62, y: 62 }, { x: 54, y: 72 }]),
+      pass([{ x: 54, y: 74 }, { x: 44, y: 86 }]),
+      run([{ x: 44, y: 86 }, { x: 40, y: 54 }]),
+    ]
+  ),
+  mkKind(
+    "seed-board-setplay-kickoff",
+    "Set play: Kick-off receive",
+    "set_play",
+    [
+      BALL(50, 72),
+      P(40, 96, "1"),
+      P(50, 94, "2"),
+      P(60, 96, "3"),
+      P(30, 108, "4"),
+      P(70, 108, "5"),
+      P(50, 122, "10"),
+    ],
+    [
+      kick([{ x: 50, y: 72 }, { x: 50, y: 92 }]),
+      pass([{ x: 50, y: 94 }, { x: 50, y: 120 }]),
     ]
   ),
 ];

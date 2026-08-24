@@ -6,6 +6,8 @@ export const ALL_TAGS: DrillTag[] = [
   "tackling",
   "evasion",
   "rucking",
+  "setpiece",
+  "kicking",
   "fitness",
   "fun",
 ];
@@ -16,6 +18,8 @@ export const TAG_LABELS: Record<DrillTag, string> = {
   tackling: "Tackling",
   evasion: "Evasion",
   rucking: "Rucking",
+  setpiece: "Set piece",
+  kicking: "Kicking",
   fitness: "Fitness",
   fun: "Fun",
 };
@@ -26,6 +30,8 @@ export const TAG_BADGE_CLASSES: Record<DrillTag, string> = {
   tackling: "bg-rose-100 text-rose-800",
   evasion: "bg-violet-100 text-violet-800",
   rucking: "bg-orange-100 text-orange-800",
+  setpiece: "bg-indigo-100 text-indigo-800",
+  kicking: "bg-teal-100 text-teal-800",
   fitness: "bg-lime-100 text-lime-800",
   fun: "bg-pink-100 text-pink-800",
 };

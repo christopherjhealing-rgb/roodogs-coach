@@ -7,7 +7,9 @@ export type DrillTag =
   | "rucking"
   | "fitness"
   | "fun"
-  | "warmup";
+  | "warmup"
+  | "setpiece"
+  | "kicking";
 
 /** Rugby positional group. */
 export type PlayerUnit = "forwards" | "backs";
