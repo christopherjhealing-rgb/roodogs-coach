@@ -100,7 +100,7 @@ export default function TeamPage() {
         </div>
       )}
 
-      <ul className="flex flex-col gap-2">
+      <ul className="grid gap-2 sm:grid-cols-2">
         {roster.map((player) =>
           editingId === player.id ? (
             <li

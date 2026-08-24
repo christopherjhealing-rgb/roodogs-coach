@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import BottomNav from "./BottomNav";
+import SideNav from "./SideNav";
 
 export default function AppShell({
   children,
@@ -9,18 +10,23 @@ export default function AppShell({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  // The board editor gets the whole viewport (landscape pitch on wide
-  // screens); everything else stays a comfortable phone-width column.
+  // The board editor gets the whole content area (landscape pitch on wide
+  // screens); every other page is centred at a comfortable reading width.
   const isBoardEditor = /^\/board\/[^/]+/.test(pathname);
 
   return (
-    <div
-      className={`mx-auto flex min-h-dvh w-full flex-col ${
-        isBoardEditor ? "" : "max-w-md"
-      }`}
-    >
-      <main className="flex-1 pb-24">{children}</main>
-      <BottomNav />
+    <div className="min-h-dvh md:flex">
+      <SideNav />
+      <div className="flex min-h-dvh min-w-0 flex-1 flex-col">
+        <main
+          className={`flex-1 pb-24 md:pb-8 ${
+            isBoardEditor ? "" : "mx-auto w-full max-w-3xl"
+          }`}
+        >
+          {children}
+        </main>
+        <BottomNav />
+      </div>
     </div>
   );
 }

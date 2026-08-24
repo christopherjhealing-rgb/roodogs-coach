@@ -228,7 +228,7 @@ export default function MatchListPage() {
         </div>
       )}
 
-      <ul className="flex flex-col gap-2">
+      <ul className="grid gap-2 sm:grid-cols-2">
         {sorted.map((match) => {
           const badge = STATUS_BADGE[match.status];
           return (
