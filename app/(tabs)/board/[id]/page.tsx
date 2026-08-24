@@ -23,6 +23,8 @@ import {
   Pitch,
   TOKEN_LABELS,
   TokenGlyph,
+  formatMetres,
+  pathLengthUnits,
   snapToGrid,
   surfaceFor,
 } from "../BoardCanvas";
@@ -68,6 +70,30 @@ interface Snapshot {
 }
 
 type Pt = { x: number; y: number };
+
+const OCT_X = [1, 1, 0, -1, -1, -1, 0, 1];
+const OCT_Y = [0, 1, 1, 1, 0, -1, -1, -1];
+
+/** With grid lock on, arrows snap to the eight compass directions with
+ *  endpoints on grid intersections (whole steps from the start). */
+function eightWaySnap(start: Pt, p: Pt, step: number): Pt {
+  const dx = p.x - start.x;
+  const dy = p.y - start.y;
+  const len = Math.hypot(dx, dy);
+  if (len < 0.01) return { ...start };
+  const oct = ((Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) % 8) + 8) % 8;
+  const ux = OCT_X[oct];
+  const uy = OCT_Y[oct];
+  const dirLen = Math.hypot(ux, uy); // 1 for cardinal, √2 for diagonal
+  let n = Math.max(1, Math.round(len / (step * dirLen)));
+  const inBounds = (k: number) => {
+    const x = start.x + ux * k * step;
+    const y = start.y + uy * k * step;
+    return x >= 0 && x <= PITCH_W && y >= 0 && y <= PITCH_H;
+  };
+  while (n > 1 && !inBounds(n)) n--;
+  return { x: start.x + ux * n * step, y: start.y + uy * n * step };
+}
 
 export default function BoardEditorPage() {
   const params = useParams<{ id: string }>();
@@ -405,7 +431,12 @@ export default function BoardEditorPage() {
         ],
       }));
     } else if (mode.kind === "draw") {
-      drawPoints.current = [p];
+      // with grid lock on, arrows start on a grid intersection
+      drawPoints.current = [
+        snap
+          ? { x: snapToGrid(p.x, snapStep), y: snapToGrid(p.y, snapStep) }
+          : p,
+      ];
       svgRef.current?.setPointerCapture(e.pointerId);
     } else if (mode.kind === "measure") {
       setSelected(null);
@@ -455,14 +486,23 @@ export default function BoardEditorPage() {
       });
     } else if (drawPoints.current.length > 0 && mode.kind === "draw") {
       const pts = drawPoints.current;
-      const last = pts[pts.length - 1];
-      // sample the path so curved drags become curved arrows
-      if (Math.hypot(p.x - last.x, p.y - last.y) >= 3) pts.push(p);
-      setPreview({
-        id: "preview",
-        type: mode.movement,
-        points: [...pts, p],
-      });
+      if (snap) {
+        // grid lock: straight arrow locked to the 8 compass directions
+        setPreview({
+          id: "preview",
+          type: mode.movement,
+          points: [pts[0], eightWaySnap(pts[0], p, stepU)],
+        });
+      } else {
+        const last = pts[pts.length - 1];
+        // sample the path so curved drags become curved arrows
+        if (Math.hypot(p.x - last.x, p.y - last.y) >= 3) pts.push(p);
+        setPreview({
+          id: "preview",
+          type: mode.movement,
+          points: [...pts, p],
+        });
+      }
     }
   }
 
@@ -508,17 +548,20 @@ export default function BoardEditorPage() {
     }
     if (drawPoints.current.length > 0 && mode.kind === "draw" && board) {
       const p = toPitch(e);
-      const pts = [...drawPoints.current];
+      let pts = [...drawPoints.current];
       drawPoints.current = [];
       setPreview(null);
-      const last = pts[pts.length - 1];
-      if (Math.hypot(p.x - last.x, p.y - last.y) >= 1) pts.push(p);
-      const length = pts.reduce(
-        (sum, pt, i) =>
-          i === 0 ? 0 : sum + Math.hypot(pt.x - pts[i - 1].x, pt.y - pts[i - 1].y),
-        0
-      );
-      if (length >= 4) {
+      if (snap) {
+        // grid lock: straight, 8-way, grid-length arrow
+        const end = eightWaySnap(pts[0], p, stepU);
+        pts = [pts[0], end];
+        if (Math.hypot(end.x - pts[0].x, end.y - pts[0].y) < 0.01) return;
+      } else {
+        const last = pts[pts.length - 1];
+        if (Math.hypot(p.x - last.x, p.y - last.y) >= 1) pts.push(p);
+      }
+      const length = pathLengthUnits(pts);
+      if (length >= (snap ? 1 : 4)) {
         commit((b) => ({
           movements: [
             ...b.movements,
@@ -1032,6 +1075,35 @@ export default function BoardEditorPage() {
         />
       ))}
       {preview && <MovementGlyph movement={preview} preview />}
+      {preview &&
+        preview.points.length >= 2 &&
+        (() => {
+          // live running distance while the arrow is being drawn
+          const lenU = pathLengthUnits(preview.points);
+          if (lenU < 2) return null;
+          const last = preview.points[preview.points.length - 1];
+          const lx = Math.min(PITCH_W - 8, Math.max(8, last.x));
+          const ly = Math.min(PITCH_H - 4, Math.max(8, last.y));
+          return (
+            <g
+              transform={`translate(${lx} ${ly}) rotate(${-screenDelta})`}
+              pointerEvents="none"
+            >
+              <text
+                textAnchor="middle"
+                dy={-5}
+                fontSize={3.6}
+                fontWeight={700}
+                fill="#fbbf24"
+                stroke="#1c1917"
+                strokeWidth={0.45}
+                paintOrder="stroke"
+              >
+                {formatMetres(lenU, widthM)}
+              </text>
+            </g>
+          );
+        })()}
       {measurePreview && (
         <MeasureGlyph
           measure={measurePreview}

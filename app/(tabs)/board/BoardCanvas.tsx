@@ -55,6 +55,22 @@ export function snapToGrid(v: number, step: number | false): number {
   return step ? Math.round(v / step) * step : v;
 }
 
+/** Total polyline length of a point list, in pitch units. */
+export function pathLengthUnits(pts: { x: number; y: number }[]): number {
+  let total = 0;
+  for (let i = 1; i < pts.length; i++) {
+    total += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+  }
+  return total;
+}
+
+/** Pitch-unit length → metre label, e.g. "7.5 m" (0.5 m steps under 10 m). */
+export function formatMetres(units: number, widthM: number): string {
+  const meters = (units / PITCH_W) * widthM;
+  const value = meters >= 10 ? Math.round(meters) : Math.round(meters * 2) / 2;
+  return `${value} m`;
+}
+
 /** Drills use a plain training field; set plays and games use a full pitch. */
 export function surfaceFor(board: { kind: BoardKind }): Surface {
   return board.kind === "drill" ? "plain" : "pitch";
@@ -328,8 +344,6 @@ export function MeasureGlyph({
   const { a, b } = measure;
   const len = Math.hypot(b.x - a.x, b.y - a.y);
   if (len < 0.5) return null;
-  const meters = (len / PITCH_W) * widthM;
-  const value = meters >= 10 ? Math.round(meters) : Math.round(meters * 2) / 2;
   const ang = (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI;
   // keep the label the right way up after any on-screen rotation
   let s = (((ang + screenDelta) % 360) + 360) % 360;
@@ -384,7 +398,7 @@ export function MeasureGlyph({
           strokeWidth={0.45}
           paintOrder="stroke"
         >
-          {value} m
+          {formatMetres(len, widthM)}
         </text>
       </g>
     </g>
