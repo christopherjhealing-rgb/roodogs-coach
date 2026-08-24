@@ -58,6 +58,12 @@ export default function TeamPage() {
   }
 
   const roster = players.filter((p) => p.active).sort(rosterCompare);
+  const forwards = roster.filter((p) => p.unit === "forwards");
+  const backs = roster.filter((p) => p.unit === "backs");
+  const unassigned = roster.filter((p) => !p.unit);
+  // Split the roster into forwards and backs once any player has a unit set;
+  // before that it's just one plain list so a new roster never looks broken.
+  const splitByUnit = forwards.length > 0 || backs.length > 0;
   const archived = players
     .filter((p) => !p.active)
     .sort((a, b) => a.name.localeCompare(b.name));
@@ -99,6 +105,100 @@ export default function TeamPage() {
     const overId = li?.dataset.pid;
     if (overId && overId !== dragId) moveTo(dragId, overId);
   }
+
+  // One roster card — either the inline edit form or the tappable row.
+  const renderCard = (player: Player) =>
+    editingId === player.id ? (
+      <li
+        key={player.id}
+        className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm"
+      >
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="font-semibold">Edit player</h2>
+          <button
+            onClick={() => setActive(player.id, false)}
+            className="min-h-[48px] rounded-lg px-3 text-sm font-medium text-amber-700"
+          >
+            Archive
+          </button>
+        </div>
+        <PlayerForm
+          initial={player}
+          submitLabel="Save"
+          onSubmit={(data) => updatePlayer(player.id, data)}
+          onCancel={() => setEditingId(null)}
+        />
+      </li>
+    ) : (
+      <li
+        key={player.id}
+        data-pid={player.id}
+        className={`flex items-stretch overflow-hidden rounded-xl border bg-white shadow-sm transition-opacity ${
+          dragId === player.id
+            ? "border-pitch opacity-60"
+            : "border-stone-200"
+        }`}
+      >
+        <button
+          onPointerDown={(e) => onHandlePointerDown(e, player.id)}
+          onPointerMove={onHandlePointerMove}
+          onPointerUp={() => setDragId(null)}
+          onPointerCancel={() => setDragId(null)}
+          aria-label={`Drag to reorder ${player.name}`}
+          className="flex w-9 shrink-0 cursor-grab touch-none items-center justify-center border-r border-stone-100 text-stone-300 hover:text-pitch active:cursor-grabbing"
+        >
+          ⠿
+        </button>
+        <button
+          onClick={() => {
+            setEditingId(player.id);
+            setAdding(false);
+          }}
+          className="flex min-h-[56px] min-w-0 flex-1 items-center justify-between gap-3 px-4 py-3 text-left active:bg-stone-50"
+        >
+          <span className="flex min-w-0 items-center gap-3">
+            {player.jersey != null && (
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-pitch text-sm font-bold text-white">
+                {player.jersey}
+              </span>
+            )}
+            <span className="min-w-0">
+              <span className="block font-semibold">{player.name}</span>
+              {(player.position || player.unit) && (
+                <span className="block truncate text-sm text-stone-500">
+                  {[player.position, player.unit && UNIT_LABEL[player.unit]]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </span>
+              )}
+              {player.notes && (
+                <span className="block truncate text-xs text-stone-400">
+                  {player.notes}
+                </span>
+              )}
+            </span>
+          </span>
+        </button>
+      </li>
+    );
+
+  // A titled group of cards (Forwards / Backs / No unit set).
+  const renderSection = (title: string, list: Player[]) =>
+    list.length === 0 ? null : (
+      <section key={title} className="flex flex-col gap-2">
+        <div className="flex items-center gap-2">
+          <h2 className="text-sm font-bold uppercase tracking-wide text-pitch">
+            {title}
+          </h2>
+          <span className="rounded-full bg-stone-100 px-2 py-0.5 text-xs font-semibold text-stone-500">
+            {list.length}
+          </span>
+        </div>
+        <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {list.map(renderCard)}
+        </ul>
+      </section>
+    );
 
   return (
     <div className="flex flex-col gap-4 px-4 pt-6">
@@ -178,87 +278,19 @@ export default function TeamPage() {
         </section>
       )}
 
-      <ul
-        className={`grid gap-3 sm:grid-cols-2 xl:grid-cols-3 ${
-          view === "formation" ? "hidden" : ""
-        }`}
-      >
-        {roster.map((player, index) =>
-          editingId === player.id ? (
-            <li
-              key={player.id}
-              className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm"
-            >
-              <div className="mb-3 flex items-center justify-between">
-                <h2 className="font-semibold">Edit player</h2>
-                <button
-                  onClick={() => setActive(player.id, false)}
-                  className="min-h-[48px] rounded-lg px-3 text-sm font-medium text-amber-700"
-                >
-                  Archive
-                </button>
-              </div>
-              <PlayerForm
-                initial={player}
-                submitLabel="Save"
-                onSubmit={(data) => updatePlayer(player.id, data)}
-                onCancel={() => setEditingId(null)}
-              />
-            </li>
-          ) : (
-            <li
-              key={player.id}
-              data-pid={player.id}
-              className={`flex items-stretch overflow-hidden rounded-xl border bg-white shadow-sm transition-opacity ${
-                dragId === player.id
-                  ? "border-pitch opacity-60"
-                  : "border-stone-200"
-              }`}
-            >
-              <button
-                onPointerDown={(e) => onHandlePointerDown(e, player.id)}
-                onPointerMove={onHandlePointerMove}
-                onPointerUp={() => setDragId(null)}
-                onPointerCancel={() => setDragId(null)}
-                aria-label={`Drag to reorder ${player.name}`}
-                className="flex w-9 shrink-0 cursor-grab touch-none items-center justify-center border-r border-stone-100 text-stone-300 hover:text-pitch active:cursor-grabbing"
-              >
-                ⠿
-              </button>
-              <button
-                onClick={() => {
-                  setEditingId(player.id);
-                  setAdding(false);
-                }}
-                className="flex min-h-[56px] min-w-0 flex-1 items-center justify-between gap-3 px-4 py-3 text-left active:bg-stone-50"
-              >
-                <span className="flex min-w-0 items-center gap-3">
-                  {player.jersey != null && (
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-pitch text-sm font-bold text-white">
-                      {player.jersey}
-                    </span>
-                  )}
-                  <span className="min-w-0">
-                    <span className="block font-semibold">{player.name}</span>
-                    {(player.position || player.unit) && (
-                      <span className="block truncate text-sm text-stone-500">
-                        {[player.position, player.unit && UNIT_LABEL[player.unit]]
-                          .filter(Boolean)
-                          .join(" · ")}
-                      </span>
-                    )}
-                    {player.notes && (
-                      <span className="block truncate text-xs text-stone-400">
-                        {player.notes}
-                      </span>
-                    )}
-                  </span>
-                </span>
-              </button>
-            </li>
-          )
-        )}
-      </ul>
+      {view === "list" &&
+        roster.length > 0 &&
+        (splitByUnit ? (
+          <div className="flex flex-col gap-5">
+            {renderSection("Forwards", forwards)}
+            {renderSection("Backs", backs)}
+            {renderSection("No unit set", unassigned)}
+          </div>
+        ) : (
+          <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {roster.map(renderCard)}
+          </ul>
+        ))}
 
       {view === "list" && hasManualOrder && (
         <button

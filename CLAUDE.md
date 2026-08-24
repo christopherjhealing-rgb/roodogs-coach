@@ -45,7 +45,12 @@ unit-tested in `lib/gameTime.test.ts`.
 
 Five bottom-nav tabs, components colocated by feature under `app/(tabs)/`:
 
-1. **Team** — roster list, add/edit/archive (soft delete via `active`)
+1. **Team** — roster, add/edit/archive (soft delete via `active`), drag-handle
+   reorder + reset-to-number-order, and a "Team shape" formation view. The list
+   splits into **Forwards** and **Backs** sections once any player has a unit
+   set (plus a "No unit set" group), falling back to one plain list before then.
+   Not the app's landing page — the root (`app/page.tsx`) and PWA `start_url`
+   open on **Sessions**, the weekly driver.
 2. **Drills** — library seeded with 25 U9 drills on first open, tag filter,
    add/edit (`lib/seedDrills.ts`). Each seed drill links to a pre-drawn
    setup diagram (`lib/seedBoards.ts`) shown on its card. `lib/ensureSeed.ts`

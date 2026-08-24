@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "Roodogs Coach",
     short_name: "Roodogs",
     description: "Coaching companion for the Wanneroo Roodogs Under 9s",
-    start_url: "/team",
+    start_url: "/sessions",
     display: "standalone",
     background_color: "#f5f5f4",
     theme_color: "#14532d",
