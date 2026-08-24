@@ -47,7 +47,9 @@ Five bottom-nav tabs, components colocated by feature under `app/(tabs)/`:
 2. **Drills** — library seeded with 25 U9 drills on first open, tag filter,
    add/edit (`lib/seedDrills.ts`)
 3. **Sessions** — session builder picking drills to ~60 min with a running
-   counter, reorder, duplicate past session
+   counter, reorder, duplicate past session. Roll call per session
+   (`attendeeIds`) and a fullscreen Present mode that steps through the
+   session drill by drill (with linked diagrams) at training.
 4. **Board** — whiteboard library for drawing drills, training games and set
    plays. Boards are tagged by kind and hold tokens (players, defenders,
    cones, hurdles, tackle bags, ball) plus movement arrows (run, pass, kick,
@@ -56,12 +58,20 @@ Five bottom-nav tabs, components colocated by feature under `app/(tabs)/`:
    `boardId` and shows its thumbnail on the drill card.
    Coordinates are pitch units (0–100 × 0–140), rendering is shared between
    the editor and list previews via `BoardCanvas.tsx`. Touch-first editor:
-   tap-to-place, drag-to-move, drag-to-draw, erase, undo.
+   tap-to-place, drag-to-move, drag-to-draw, erase, undo. Extras: ▶ Play
+   animates tokens along their arrows (nearest token to an arrow's start
+   gets paired with it), ⤴ shares the board as a PNG, cones have a colour
+   picker, players a number picker, and there's a Dad token for helpers.
+   Landscape layout on wide screens plus a fullscreen button.
 5. **Match** — match list, squad + starting line-up setup, live match mode
    (two-column sub swapping, per-player try/tackle with undo toast, pause for
-   halftime, needs-minutes highlight), full-time summary
+   halftime, needs-minutes highlight, fairness tip suggesting the next sub
+   once the gap passes 4 minutes), break-time fairness summary, full-time
+   summary with an optional player-of-the-match pick (`playerOfMatchId`)
 
-Plus `/stats` (linked from the Match tab): season totals per player.
+Plus `/stats` (linked from the Match tab): season totals per player
+including trainings attended, positive-only milestone badges, and CSV
+export via the share sheet.
 
 ## Conventions
 

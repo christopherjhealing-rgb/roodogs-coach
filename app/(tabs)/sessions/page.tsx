@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { newId, storage } from "@/lib/storage";
 import { SEED_DRILLS } from "@/lib/seedDrills";
-import type { Drill, Session } from "@/lib/types";
+import type { Board, Drill, Player, Session } from "@/lib/types";
+import PresentMode from "./PresentMode";
 import SessionBuilder from "./SessionBuilder";
 
 function formatDate(iso: string): string {
@@ -19,9 +20,13 @@ function formatDate(iso: string): string {
 export default function SessionsPage() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [drills, setDrills] = useState<Drill[]>([]);
+  const [players, setPlayers] = useState<Player[]>([]);
+  const [boards, setBoards] = useState<Board[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [rollOpenId, setRollOpenId] = useState<string | null>(null);
+  const [presentingId, setPresentingId] = useState<string | null>(null);
 
   useEffect(() => {
     // Seed drills here too, so the builder isn't empty if this tab is
@@ -33,6 +38,8 @@ export default function SessionsPage() {
     }
     setDrills(storedDrills);
     setSessions(storage.getSessions());
+    setPlayers(storage.getPlayers().filter((p) => p.active));
+    setBoards(storage.getBoards());
     setLoaded(true);
   }, []);
 
@@ -61,6 +68,18 @@ export default function SessionsPage() {
     save([...sessions, copy]);
     setEditingId(copy.id);
     setAdding(false);
+  }
+
+  function toggleAttendee(session: Session, playerId: string) {
+    const current = session.attendeeIds ?? [];
+    const next = current.includes(playerId)
+      ? current.filter((id) => id !== playerId)
+      : [...current, playerId];
+    save(
+      sessions.map((s) =>
+        s.id === session.id ? { ...s, attendeeIds: next } : s
+      )
+    );
   }
 
   const byId = new Map(drills.map((d) => [d.id, d]));
@@ -179,7 +198,26 @@ export default function SessionsPage() {
                   </span>
                 )}
               </button>
-              <div className="flex justify-end px-2 pb-1 pt-1">
+              <div className="flex items-center justify-between px-2 pb-1 pt-1">
+                <div className="flex">
+                  {session.drillIds.length > 0 && (
+                    <button
+                      onClick={() => setPresentingId(session.id)}
+                      className="min-h-[44px] rounded-lg px-3 text-sm font-semibold text-pitch"
+                    >
+                      ▶ Present
+                    </button>
+                  )}
+                  <button
+                    onClick={() =>
+                      setRollOpenId(rollOpenId === session.id ? null : session.id)
+                    }
+                    className="min-h-[44px] rounded-lg px-3 text-sm font-medium text-stone-500"
+                  >
+                    Roll call ({(session.attendeeIds ?? []).length}/
+                    {players.length})
+                  </button>
+                </div>
                 <button
                   onClick={() => duplicateSession(session)}
                   className="min-h-[44px] rounded-lg px-3 text-sm font-semibold text-pitch"
@@ -187,10 +225,53 @@ export default function SessionsPage() {
                   Duplicate
                 </button>
               </div>
+              {rollOpenId === session.id && (
+                <div className="flex flex-wrap gap-1.5 border-t border-stone-100 px-4 py-3">
+                  {players.length === 0 && (
+                    <p className="text-sm text-stone-500">
+                      Add players on the Team tab first.
+                    </p>
+                  )}
+                  {players.map((p) => {
+                    const here = (session.attendeeIds ?? []).includes(p.id);
+                    return (
+                      <button
+                        key={p.id}
+                        onClick={() => toggleAttendee(session, p.id)}
+                        aria-pressed={here}
+                        className={`min-h-[44px] rounded-full border px-3 text-sm font-medium ${
+                          here
+                            ? "border-pitch bg-pitch text-white"
+                            : "border-stone-300 bg-white text-stone-500"
+                        }`}
+                      >
+                        {here ? "✓ " : ""}
+                        {p.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </li>
           )
         )}
       </ul>
+
+      {presentingId &&
+        (() => {
+          const session = sessions.find((s) => s.id === presentingId);
+          if (!session) return null;
+          const sessionDrills = session.drillIds
+            .map((id) => byId.get(id))
+            .filter((d): d is Drill => d !== undefined);
+          return (
+            <PresentMode
+              drills={sessionDrills}
+              boards={new Map(boards.map((b) => [b.id, b]))}
+              onClose={() => setPresentingId(null)}
+            />
+          );
+        })()}
     </div>
   );
 }

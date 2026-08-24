@@ -113,3 +113,53 @@ export function formatClock(ms: number): string {
 export function formatMins(ms: number): string {
   return `${Math.round(ms / 60000)} min`;
 }
+
+export interface FairnessSummary {
+  minMs: number;
+  maxMs: number;
+  avgMs: number;
+  /** Gap between the most- and least-played players. */
+  spreadMs: number;
+  /** Ids of players noticeably behind the average (under 75% of it). */
+  needsMinutes: string[];
+}
+
+/** Kickd-style fairness check across the squad's game times. */
+export function fairnessSummary(
+  times: { id: string; ms: number }[]
+): FairnessSummary {
+  if (times.length === 0) {
+    return { minMs: 0, maxMs: 0, avgMs: 0, spreadMs: 0, needsMinutes: [] };
+  }
+  const values = times.map((t) => t.ms);
+  const minMs = Math.min(...values);
+  const maxMs = Math.max(...values);
+  const avgMs = values.reduce((a, b) => a + b, 0) / values.length;
+  return {
+    minMs,
+    maxMs,
+    avgMs,
+    spreadMs: maxMs - minMs,
+    needsMinutes: times
+      .filter((t) => t.ms < avgMs * 0.75)
+      .sort((a, b) => a.ms - b.ms)
+      .map((t) => t.id),
+  };
+}
+
+/**
+ * Suggest the next sub to level the minutes: the least-played bench player
+ * on for the most-played on-field player — but only once the gap between
+ * them is worth acting on (thresholdMs).
+ */
+export function suggestSub(
+  onField: { id: string; ms: number }[],
+  bench: { id: string; ms: number }[],
+  thresholdMs: number
+): { onId: string; offId: string } | null {
+  if (onField.length === 0 || bench.length === 0) return null;
+  const on = [...bench].sort((a, b) => a.ms - b.ms)[0];
+  const off = [...onField].sort((a, b) => b.ms - a.ms)[0];
+  if (off.ms - on.ms < thresholdMs) return null;
+  return { onId: on.id, offId: off.id };
+}

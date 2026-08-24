@@ -25,6 +25,8 @@ export default function DrillForm({
   const [equipment, setEquipment] = useState(initial?.equipment ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
   const [boardId, setBoardId] = useState(initial?.boardId ?? "");
+  const [easier, setEasier] = useState(initial?.easier ?? "");
+  const [harder, setHarder] = useState(initial?.harder ?? "");
 
   const trimmedName = name.trim();
   const duration = Number(durationMins);
@@ -48,6 +50,8 @@ export default function DrillForm({
           equipment: equipment.trim(),
           description: description.trim(),
           boardId: boardId || undefined,
+          easier: easier.trim() || undefined,
+          harder: harder.trim() || undefined,
         });
       }}
       className="flex flex-col gap-3"
@@ -118,6 +122,28 @@ export default function DrillForm({
           placeholder="How it runs, coaching points, how to make it harder or easier"
           rows={3}
           className="rounded-lg border border-stone-300 px-3 py-2 text-base outline-none focus:border-pitch focus:ring-1 focus:ring-pitch"
+        />
+      </label>
+
+      <label className="flex flex-col gap-1 text-sm font-medium">
+        Make it easier{" "}
+        <span className="font-normal text-stone-400">(optional)</span>
+        <input
+          value={easier}
+          onChange={(e) => setEasier(e.target.value)}
+          placeholder="e.g. Walk pace, bigger grid, two-hand touch"
+          className="min-h-[48px] rounded-lg border border-stone-300 px-3 text-base outline-none focus:border-pitch focus:ring-1 focus:ring-pitch"
+        />
+      </label>
+
+      <label className="flex flex-col gap-1 text-sm font-medium">
+        Make it harder{" "}
+        <span className="font-normal text-stone-400">(optional)</span>
+        <input
+          value={harder}
+          onChange={(e) => setHarder(e.target.value)}
+          placeholder="e.g. Add a defender, shrink the grid, weak hand only"
+          className="min-h-[48px] rounded-lg border border-stone-300 px-3 text-base outline-none focus:border-pitch focus:ring-1 focus:ring-pitch"
         />
       </label>
 

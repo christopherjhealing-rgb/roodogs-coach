@@ -6,11 +6,13 @@ import { useEffect, useRef, useState } from "react";
 import {
   clockElapsedMs,
   countEvents,
+  fairnessSummary,
   finalWhistleMs,
   formatClock,
   isClockRunning,
   onFieldIds,
   playerGameTimeMs,
+  suggestSub,
 } from "@/lib/gameTime";
 import { newId, storage } from "@/lib/storage";
 import type { Match, MatchEvent, Player } from "@/lib/types";
@@ -121,6 +123,13 @@ export default function MatchDetailPage() {
   const behindThreshold =
     elapsed > 4 * 60_000 ? maxTime * 0.6 : -1;
 
+  const timeOf = (p: Player) => ({ id: p.id, ms: timeById.get(p.id) ?? 0 });
+  const fairness = fairnessSummary(squad.map(timeOf));
+  const suggestion =
+    match.status === "live" && running && elapsed > 4 * 60_000
+      ? suggestSub(onField.map(timeOf), bench.map(timeOf), 4 * 60_000)
+      : null;
+
   function kickOff() {
     if (!match) return;
     const t = Date.now();
@@ -165,22 +174,19 @@ export default function MatchDetailPage() {
     setToast(null);
   }
 
-  function trySwap(onId: string | null, benchId: string | null) {
-    setSelectedOn(onId);
-    setSelectedBench(benchId);
-    if (!onId || !benchId) return;
+  function doSwap(offId: string, onIdNew: string) {
     const t = Date.now();
     const off: MatchEvent = {
       id: newId(),
       matchId,
-      playerId: onId,
+      playerId: offId,
       type: "sub_off",
       timestampMs: t,
     };
     const on: MatchEvent = {
       id: newId(),
       matchId,
-      playerId: benchId,
+      playerId: onIdNew,
       type: "sub_on",
       timestampMs: t,
     };
@@ -188,9 +194,16 @@ export default function MatchDetailPage() {
     setSelectedOn(null);
     setSelectedBench(null);
     showToast(
-      `Sub: ${byId.get(benchId)?.name ?? "?"} on for ${byId.get(onId)?.name ?? "?"}`,
+      `Sub: ${byId.get(onIdNew)?.name ?? "?"} on for ${byId.get(offId)?.name ?? "?"}`,
       [off.id, on.id]
     );
+  }
+
+  function trySwap(onId: string | null, benchId: string | null) {
+    setSelectedOn(onId);
+    setSelectedBench(benchId);
+    if (!onId || !benchId) return;
+    doSwap(onId, benchId);
   }
 
   function recordStat(playerId: string, type: "try" | "tackle") {
@@ -298,9 +311,45 @@ export default function MatchDetailPage() {
           </section>
 
           {!running && (
-            <p className="rounded-lg bg-amber-100 px-3 py-2 text-center text-sm font-medium text-amber-800">
-              Clock paused — nobody&apos;s accruing game time.
-            </p>
+            <section className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+              <h2 className="text-sm font-bold text-amber-900">
+                Break — fairness check
+              </h2>
+              <p className="text-sm text-amber-800">
+                Gap between most and least game time:{" "}
+                <strong>{formatClock(fairness.spreadMs)}</strong> (average{" "}
+                {formatClock(fairness.avgMs)}).
+              </p>
+              {fairness.needsMinutes.length > 0 ? (
+                <p className="pt-1 text-sm font-medium text-amber-900">
+                  Needs more minutes:{" "}
+                  {fairness.needsMinutes
+                    .map((id) => byId.get(id)?.name)
+                    .filter(Boolean)
+                    .join(", ")}
+                </p>
+              ) : (
+                <p className="pt-1 text-sm text-amber-800">
+                  Everyone&apos;s getting a fair run. 👏
+                </p>
+              )}
+            </section>
+          )}
+
+          {suggestion && (
+            <section className="flex items-center justify-between gap-2 rounded-xl border border-sky-200 bg-sky-50 px-4 py-2">
+              <p className="text-sm text-sky-900">
+                <span className="font-bold">Fairness tip:</span>{" "}
+                {byId.get(suggestion.onId)?.name} on for{" "}
+                {byId.get(suggestion.offId)?.name}
+              </p>
+              <button
+                onClick={() => doSwap(suggestion.offId, suggestion.onId)}
+                className="min-h-[44px] shrink-0 rounded-lg bg-sky-600 px-3 text-sm font-bold text-white"
+              >
+                Make the sub
+              </button>
+            </section>
           )}
 
           <p className="text-center text-xs text-stone-400">
@@ -408,8 +457,44 @@ export default function MatchDetailPage() {
           <h1 className="text-xl font-bold">Full-time</h1>
           <p className="text-sm text-stone-600">
             {ourTries} {ourTries === 1 ? "try" : "tries"} to the Roodogs ·{" "}
-            {formatClock(elapsed)} played
+            {formatClock(elapsed)} played · fair-time gap{" "}
+            {formatClock(fairness.spreadMs)}
           </p>
+
+          <section className="rounded-xl border border-stone-200 bg-white p-3">
+            <h2 className="text-sm font-semibold">
+              🏅 Player of the match{" "}
+              <span className="font-normal text-stone-400">(optional)</span>
+            </h2>
+            <div className="flex flex-wrap gap-1.5 pt-2">
+              {squad
+                .slice()
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .map((p) => {
+                  const chosen = match.playerOfMatchId === p.id;
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() =>
+                        saveMatch({
+                          ...match,
+                          playerOfMatchId: chosen ? undefined : p.id,
+                        })
+                      }
+                      aria-pressed={chosen}
+                      className={`min-h-[44px] rounded-full border px-3 text-sm font-medium ${
+                        chosen
+                          ? "border-amber-500 bg-amber-400 text-amber-950"
+                          : "border-stone-300 bg-white text-stone-600"
+                      }`}
+                    >
+                      {chosen ? "🏅 " : ""}
+                      {p.name}
+                    </button>
+                  );
+                })}
+            </div>
+          </section>
           <label className="flex flex-col gap-1 text-sm font-medium">
             Result <span className="font-normal text-stone-400">(optional)</span>
             <input

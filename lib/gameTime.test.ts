@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  fairnessSummary,
+  suggestSub,
   clockElapsedMs,
   countEvents,
   finalWhistleMs,
@@ -114,6 +116,48 @@ describe("countEvents", () => {
     expect(countEvents(events, "a", "try")).toBe(2);
     expect(countEvents(events, "a", "tackle")).toBe(1);
     expect(countEvents(events, "b", "tackle")).toBe(0);
+  });
+});
+
+describe("fairnessSummary", () => {
+  it("reports spread and who needs minutes", () => {
+    const s = fairnessSummary([
+      { id: "a", ms: 10 * MIN },
+      { id: "b", ms: 8 * MIN },
+      { id: "c", ms: 2 * MIN }, // well under 75% of the 6:40 average
+    ]);
+    expect(s.maxMs).toBe(10 * MIN);
+    expect(s.minMs).toBe(2 * MIN);
+    expect(s.spreadMs).toBe(8 * MIN);
+    expect(s.needsMinutes).toEqual(["c"]);
+  });
+
+  it("handles an empty squad", () => {
+    expect(fairnessSummary([]).spreadMs).toBe(0);
+  });
+});
+
+describe("suggestSub", () => {
+  const onField = [
+    { id: "a", ms: 12 * MIN },
+    { id: "b", ms: 9 * MIN },
+  ];
+  const bench = [
+    { id: "c", ms: 3 * MIN },
+    { id: "d", ms: 7 * MIN },
+  ];
+
+  it("pairs least-played bench with most-played on-field", () => {
+    expect(suggestSub(onField, bench, 4 * MIN)).toEqual({
+      onId: "c",
+      offId: "a",
+    });
+  });
+
+  it("stays quiet when the gap is small", () => {
+    expect(suggestSub(onField, bench, 10 * MIN)).toBeNull();
+    expect(suggestSub(onField, [], 0)).toBeNull();
+    expect(suggestSub([], bench, 0)).toBeNull();
   });
 });
 

@@ -26,6 +26,10 @@ export interface Drill {
   description: string;
   /** Optional whiteboard diagram for this drill. */
   boardId?: string;
+  /** How to tone the drill down for kids finding it hard. */
+  easier?: string;
+  /** How to stretch the kids who've got it. */
+  harder?: string;
 }
 
 export interface Session {
@@ -33,6 +37,8 @@ export interface Session {
   date: string;
   drillIds: string[];
   notes: string;
+  /** Roll call — players who made it to training. */
+  attendeeIds?: string[];
 }
 
 export type MatchStatus = "setup" | "live" | "finished";
@@ -56,6 +62,8 @@ export interface Match {
   /** Clock bookkeeping — game time is computed from event overlap with
    *  these periods, so halftime never counts toward anyone's minutes. */
   clockPeriods?: ClockPeriod[];
+  /** Positive-only award picked after full-time. */
+  playerOfMatchId?: string;
 }
 
 export type MatchEventType = "sub_on" | "sub_off" | "try" | "tackle";

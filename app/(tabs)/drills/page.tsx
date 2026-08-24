@@ -177,6 +177,20 @@ export default function DrillsPage() {
                     Gear: {drill.equipment}
                   </span>
                 )}
+                {drill.easier && (
+                  <span className="text-xs text-stone-500">
+                    <span className="font-semibold text-sky-700">Easier:</span>{" "}
+                    {drill.easier}
+                  </span>
+                )}
+                {drill.harder && (
+                  <span className="text-xs text-stone-500">
+                    <span className="font-semibold text-amber-700">
+                      Harder:
+                    </span>{" "}
+                    {drill.harder}
+                  </span>
+                )}
                 {(() => {
                   const board = drill.boardId
                     ? boards.find((b) => b.id === drill.boardId)

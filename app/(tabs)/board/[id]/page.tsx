@@ -53,6 +53,47 @@ interface Snapshot {
   movements: BoardMovement[];
 }
 
+/** Position along a movement's path at progress t (0..1), matching how
+ *  MovementGlyph draws it (arc for a two-point jump, polyline otherwise). */
+function pointAlong(m: BoardMovement, t: number): { x: number; y: number } {
+  const pts = m.points;
+  if (pts.length < 2) return pts[0] ?? { x: 0, y: 0 };
+  if (pts.length === 2 && m.type === "jump") {
+    const [s, e] = pts;
+    const mx = (s.x + e.x) / 2;
+    const my = (s.y + e.y) / 2;
+    const dx = e.x - s.x;
+    const dy = e.y - s.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const cx = mx - (dy / len) * len * 0.3;
+    const cy = my + (dx / len) * len * 0.3;
+    const u = 1 - t;
+    return {
+      x: u * u * s.x + 2 * u * t * cx + t * t * e.x,
+      y: u * u * s.y + 2 * u * t * cy + t * t * e.y,
+    };
+  }
+  const segs: number[] = [];
+  let total = 0;
+  for (let i = 1; i < pts.length; i++) {
+    const d = Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
+    segs.push(d);
+    total += d;
+  }
+  let dist = t * total;
+  for (let i = 0; i < segs.length; i++) {
+    if (dist <= segs[i] || i === segs.length - 1) {
+      const f = segs[i] === 0 ? 1 : Math.min(1, dist / segs[i]);
+      return {
+        x: pts[i].x + (pts[i + 1].x - pts[i].x) * f,
+        y: pts[i].y + (pts[i + 1].y - pts[i].y) * f,
+      };
+    }
+    dist -= segs[i];
+  }
+  return pts[pts.length - 1];
+}
+
 export default function BoardEditorPage() {
   const params = useParams<{ id: string }>();
   const boardId = params.id;
@@ -76,6 +117,119 @@ export default function BoardEditorPage() {
   // sampled finger path while drawing an arrow — empty means not drawing
   const drawPoints = useRef<{ x: number; y: number }[]>([]);
   const [preview, setPreview] = useState<BoardMovement | null>(null);
+
+  // play-animation state: token id → animated position
+  const [playing, setPlaying] = useState(false);
+  const [animPositions, setAnimPositions] = useState<Map<
+    string,
+    { x: number; y: number }
+  > | null>(null);
+  const animRaf = useRef(0);
+
+  useEffect(() => () => cancelAnimationFrame(animRaf.current), []);
+
+  function play() {
+    if (!board || playing) return;
+    // pair each arrow with the nearest unclaimed token at its start
+    const assignments: { tokenId: string; movement: BoardMovement }[] = [];
+    const used = new Set<string>();
+    for (const m of board.movements) {
+      if (m.points.length < 2) continue;
+      let best: BoardToken | null = null;
+      let bestD = Infinity;
+      for (const t of board.tokens) {
+        if (used.has(t.id)) continue;
+        const d = Math.hypot(t.x - m.points[0].x, t.y - m.points[0].y);
+        if (d < bestD) {
+          bestD = d;
+          best = t;
+        }
+      }
+      if (best && bestD <= 10) {
+        assignments.push({ tokenId: best.id, movement: m });
+        used.add(best.id);
+      }
+    }
+    if (assignments.length === 0) return;
+    setPlaying(true);
+    const startTs = performance.now();
+    const DURATION = 2800;
+    const tick = (nowTs: number) => {
+      const t = Math.min(1, (nowTs - startTs) / DURATION);
+      const ease = t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2;
+      setAnimPositions(
+        new Map(
+          assignments.map((a) => [a.tokenId, pointAlong(a.movement, ease)])
+        )
+      );
+      if (t < 1) {
+        animRaf.current = requestAnimationFrame(tick);
+      } else {
+        window.setTimeout(() => {
+          setAnimPositions(null);
+          setPlaying(false);
+        }, 800);
+      }
+    };
+    animRaf.current = requestAnimationFrame(tick);
+  }
+
+  async function shareImage() {
+    const svgEl = svgRef.current;
+    if (!svgEl || !board) return;
+    const clone = svgEl.cloneNode(true) as SVGSVGElement;
+    clone.removeAttribute("class");
+    clone.removeAttribute("style");
+    const vb = svgEl.viewBox.baseVal;
+    const scale = 8;
+    const w = vb.width * scale;
+    const h = vb.height * scale;
+    clone.setAttribute("width", String(w));
+    clone.setAttribute("height", String(h));
+    const xml = new XMLSerializer().serializeToString(clone);
+    const url = URL.createObjectURL(
+      new Blob([xml], { type: "image/svg+xml" })
+    );
+    try {
+      const img = new Image();
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = url;
+      });
+      const canvasEl = document.createElement("canvas");
+      canvasEl.width = w;
+      canvasEl.height = h;
+      canvasEl.getContext("2d")!.drawImage(img, 0, 0, w, h);
+      const blob: Blob | null = await new Promise((resolve) =>
+        canvasEl.toBlob(resolve, "image/png")
+      );
+      if (!blob) return;
+      const file = new File(
+        [blob],
+        `${board.name.replace(/[^\w\- ]+/g, "").trim() || "board"}.png`,
+        { type: "image/png" }
+      );
+      const nav = navigator as Navigator & {
+        canShare?: (d: { files: File[] }) => boolean;
+      };
+      if (nav.canShare?.({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file], title: board.name });
+          return;
+        } catch {
+          // cancelled or unsupported — fall through to download
+        }
+      }
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = file.name;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
 
   useEffect(() => {
     setBoard(storage.getBoards().find((b) => b.id === boardId) ?? null);
@@ -173,7 +327,7 @@ export default function BoardEditorPage() {
   }
 
   function onCanvasPointerDown(e: React.PointerEvent) {
-    if (!board) return;
+    if (!board || playing) return;
     const p = toPitch(e);
     if (mode.kind === "place") {
       let label: string | undefined;
@@ -196,7 +350,7 @@ export default function BoardEditorPage() {
   }
 
   function onCanvasPointerMove(e: React.PointerEvent) {
-    if (!board) return;
+    if (!board || playing) return;
     const p = toPitch(e);
     if (dragTokenId.current) {
       // move without recording history every pixel — snapshot was taken on grab
@@ -248,6 +402,7 @@ export default function BoardEditorPage() {
   }
 
   function onTokenPointerDown(e: React.PointerEvent, token: BoardToken) {
+    if (playing) return;
     if (mode.kind === "move") {
       e.stopPropagation();
       // snapshot once at grab time so the whole drag is one undo step
@@ -262,6 +417,7 @@ export default function BoardEditorPage() {
   }
 
   function onMovementPointerDown(e: React.PointerEvent, movement: BoardMovement) {
+    if (playing) return;
     if (mode.kind === "erase") {
       e.stopPropagation();
       commit((b) => ({
@@ -443,17 +599,20 @@ export default function BoardEditorPage() {
         />
       ))}
       {preview && <MovementGlyph movement={preview} preview />}
-      {board.tokens.map((t) => (
-        <g
-          key={t.id}
-          transform={`translate(${t.x} ${t.y})`}
-          onPointerDown={(e) => onTokenPointerDown(e, t)}
-        >
-          {/* generous invisible hit area for cold thumbs */}
-          <circle r={6} fill="transparent" />
-          <TokenGlyph token={t} />
-        </g>
-      ))}
+      {board.tokens.map((t) => {
+        const pos = animPositions?.get(t.id) ?? t;
+        return (
+          <g
+            key={t.id}
+            transform={`translate(${pos.x} ${pos.y})`}
+            onPointerDown={(e) => onTokenPointerDown(e, t)}
+          >
+            {/* generous invisible hit area for cold thumbs */}
+            <circle r={6} fill="transparent" />
+            <TokenGlyph token={t} />
+          </g>
+        );
+      })}
     </>
   );
 
@@ -505,12 +664,31 @@ export default function BoardEditorPage() {
           aria-label="Board name"
           className="min-h-[44px] w-full min-w-0 rounded-lg border border-transparent bg-transparent px-2 font-semibold outline-none focus:border-stone-300"
         />
+        {board.movements.length > 0 && (
+          <button
+            onClick={play}
+            disabled={playing}
+            aria-label="Play the movements"
+            title="Play the movements"
+            className="min-h-[44px] shrink-0 rounded-lg bg-pitch px-3 text-sm font-bold text-white disabled:opacity-40"
+          >
+            ▶ Play
+          </button>
+        )}
+        <button
+          onClick={shareImage}
+          aria-label="Share as image"
+          title="Share as image"
+          className="min-h-[44px] shrink-0 rounded-lg border border-stone-300 bg-white px-3 text-sm font-semibold text-stone-600"
+        >
+          ⤴
+        </button>
         <button
           onClick={toggleFullscreen}
           aria-label={fullscreen ? "Exit full screen" : "Full screen"}
           className="min-h-[44px] shrink-0 rounded-lg border border-stone-300 bg-white px-3 text-sm font-semibold text-stone-600"
         >
-          {fullscreen ? "✕ Exit" : "⛶ Full screen"}
+          {fullscreen ? "✕ Exit" : "⛶"}
         </button>
         <button
           onClick={undo}
