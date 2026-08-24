@@ -31,6 +31,10 @@ export default function PlayerForm({
   const [unit, setUnit] = useState<PlayerUnit | "">(initial?.unit ?? "");
   const trimmed = name.trim();
 
+  const field =
+    "min-h-[48px] w-full rounded-lg border border-stone-300 px-3 text-base outline-none focus:border-pitch focus:ring-1 focus:ring-pitch";
+  const labelCls = "flex flex-col gap-1.5 text-sm font-medium text-stone-700";
+
   return (
     <form
       onSubmit={(e) => {
@@ -45,51 +49,41 @@ export default function PlayerForm({
           unit: unit || undefined,
         });
       }}
-      className="flex flex-col gap-3"
+      className="flex flex-col gap-4"
     >
-      <div className="flex gap-3">
-        <label className="flex flex-1 flex-col gap-1 text-sm font-medium">
-          Name
-          <input
-            autoFocus
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="First name, e.g. Ruby"
-            className="min-h-[48px] rounded-lg border border-stone-300 px-3 text-base outline-none focus:border-pitch focus:ring-1 focus:ring-pitch"
-          />
-        </label>
-        <label className="flex w-24 flex-col gap-1 text-sm font-medium">
-          Jersey <span className="font-normal text-stone-400">#</span>
-          <input
-            type="number"
-            inputMode="numeric"
-            min={0}
-            max={99}
-            value={jersey}
-            onChange={(e) => setJersey(e.target.value)}
-            placeholder="—"
-            className="min-h-[48px] rounded-lg border border-stone-300 px-3 text-base outline-none focus:border-pitch focus:ring-1 focus:ring-pitch"
-          />
-        </label>
-      </div>
+      <label className={labelCls}>
+        Name
+        <input
+          autoFocus
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="First name, e.g. Ruby"
+          className={field}
+        />
+      </label>
 
-      <div className="flex gap-3">
-        <label className="flex flex-1 flex-col gap-1 text-sm font-medium">
-          Position{" "}
+      <div className="grid grid-cols-2 gap-4">
+        <label className={labelCls}>
+          Jersey number{" "}
           <span className="font-normal text-stone-400">(optional)</span>
           <input
-            value={position}
-            onChange={(e) => setPosition(e.target.value)}
-            placeholder="e.g. Fly-half, Prop"
-            className="min-h-[48px] rounded-lg border border-stone-300 px-3 text-base outline-none focus:border-pitch focus:ring-1 focus:ring-pitch"
+            type="text"
+            inputMode="numeric"
+            value={jersey}
+            onChange={(e) =>
+              setJersey(e.target.value.replace(/\D/g, "").slice(0, 2))
+            }
+            placeholder="—"
+            className={field}
           />
         </label>
-        <label className="flex w-36 flex-col gap-1 text-sm font-medium">
-          Forwards / Backs
+        <label className={labelCls}>
+          Forwards / Backs{" "}
+          <span className="font-normal text-stone-400">(optional)</span>
           <select
             value={unit}
             onChange={(e) => setUnit(e.target.value as PlayerUnit | "")}
-            className="min-h-[48px] rounded-lg border border-stone-300 bg-white px-3 text-base outline-none focus:border-pitch focus:ring-1 focus:ring-pitch"
+            className={`${field} bg-white`}
           >
             <option value="">—</option>
             <option value="forwards">Forwards</option>
@@ -98,18 +92,28 @@ export default function PlayerForm({
         </label>
       </div>
 
-      <label className="flex flex-col gap-1 text-sm font-medium">
+      <label className={labelCls}>
+        Position <span className="font-normal text-stone-400">(optional)</span>
+        <input
+          value={position}
+          onChange={(e) => setPosition(e.target.value)}
+          placeholder="e.g. Fly-half, Prop"
+          className={field}
+        />
+      </label>
+
+      <label className={labelCls}>
         Notes <span className="font-normal text-stone-400">(optional)</span>
         <textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           placeholder="Anything worth remembering — big left boot, loves a run…"
           rows={2}
-          className="rounded-lg border border-stone-300 px-3 py-2 text-base outline-none focus:border-pitch focus:ring-1 focus:ring-pitch"
+          className={`${field} py-2`}
         />
       </label>
 
-      <div className="flex gap-2">
+      <div className="flex gap-2 pt-1">
         <button
           type="submit"
           disabled={!trimmed}
@@ -120,7 +124,7 @@ export default function PlayerForm({
         <button
           type="button"
           onClick={onCancel}
-          className="min-h-[48px] rounded-lg border border-stone-300 px-4 font-medium text-stone-600"
+          className="min-h-[48px] rounded-lg border border-stone-300 px-5 font-medium text-stone-600"
         >
           Cancel
         </button>
