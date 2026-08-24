@@ -112,8 +112,14 @@ export default function BoardEditorPage() {
   const [fullscreen, setFullscreen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
+  // what's tapped in Move mode — shows a selection ring and a delete button
+  const [selected, setSelected] = useState<
+    { kind: "token" | "movement"; id: string } | null
+  >(null);
+
   const svgRef = useRef<SVGSVGElement | null>(null);
   const dragTokenId = useRef<string | null>(null);
+  const dragUndoTaken = useRef(false);
   // sampled finger path while drawing an arrow — empty means not drawing
   const drawPoints = useRef<{ x: number; y: number }[]>([]);
   const [preview, setPreview] = useState<BoardMovement | null>(null);
@@ -277,8 +283,8 @@ export default function BoardEditorPage() {
     );
   }
 
-  /** Apply a change to tokens/movements, recording undo history. */
-  function commit(change: (b: Board) => Partial<Snapshot>) {
+  /** Snapshot the current board onto the undo stack. */
+  function pushUndo() {
     if (!board) return;
     setUndoStack((prev) => [
       ...prev.slice(-49),
@@ -290,7 +296,25 @@ export default function BoardEditorPage() {
         })),
       },
     ]);
+  }
+
+  /** Apply a change to tokens/movements, recording undo history. */
+  function commit(change: (b: Board) => Partial<Snapshot>) {
+    if (!board) return;
+    pushUndo();
     persist({ ...board, ...change(board) });
+  }
+
+  function deleteSelected() {
+    if (!board || !selected) return;
+    if (selected.kind === "token") {
+      commit((b) => ({ tokens: b.tokens.filter((t) => t.id !== selected.id) }));
+    } else {
+      commit((b) => ({
+        movements: b.movements.filter((m) => m.id !== selected.id),
+      }));
+    }
+    setSelected(null);
   }
 
   function undo() {
@@ -329,7 +353,10 @@ export default function BoardEditorPage() {
   function onCanvasPointerDown(e: React.PointerEvent) {
     if (!board || playing) return;
     const p = toPitch(e);
-    if (mode.kind === "place") {
+    if (mode.kind === "move") {
+      // tap on empty pitch clears the selection
+      setSelected(null);
+    } else if (mode.kind === "place") {
       let label: string | undefined;
       if (mode.token === "player") {
         const n = playerNum ?? nextAutoNumber(board.tokens);
@@ -353,7 +380,12 @@ export default function BoardEditorPage() {
     if (!board || playing) return;
     const p = toPitch(e);
     if (dragTokenId.current) {
-      // move without recording history every pixel — snapshot was taken on grab
+      // snapshot once, on the first actual move, so a plain tap-to-select
+      // doesn't add an empty undo step
+      if (!dragUndoTaken.current) {
+        pushUndo();
+        dragUndoTaken.current = true;
+      }
       persist({
         ...board,
         tokens: board.tokens.map((t) =>
@@ -405,9 +437,11 @@ export default function BoardEditorPage() {
     if (playing) return;
     if (mode.kind === "move") {
       e.stopPropagation();
-      // snapshot once at grab time so the whole drag is one undo step
-      commit((b) => ({ tokens: b.tokens }));
+      // select it (so the delete button shows) and arm a drag; the undo
+      // snapshot is deferred until the token actually moves
+      setSelected({ kind: "token", id: token.id });
       dragTokenId.current = token.id;
+      dragUndoTaken.current = false;
       svgRef.current?.setPointerCapture(e.pointerId);
     } else if (mode.kind === "erase") {
       e.stopPropagation();
@@ -418,7 +452,10 @@ export default function BoardEditorPage() {
 
   function onMovementPointerDown(e: React.PointerEvent, movement: BoardMovement) {
     if (playing) return;
-    if (mode.kind === "erase") {
+    if (mode.kind === "move") {
+      e.stopPropagation();
+      setSelected({ kind: "movement", id: movement.id });
+    } else if (mode.kind === "erase") {
       e.stopPropagation();
       commit((b) => ({
         movements: b.movements.filter((m) => m.id !== movement.id),
@@ -557,7 +594,7 @@ export default function BoardEditorPage() {
 
   const hint = (
     <p className="text-center text-xs text-stone-400">
-      {mode.kind === "move" && "Drag anything to move it."}
+      {mode.kind === "move" && "Tap to select, drag to move, tap the red × to delete."}
       {mode.kind === "place" && `Tap the pitch to place a ${TOKEN_LABELS[mode.token].toLowerCase()}.`}
       {mode.kind === "draw" && `Drag on the pitch to draw a ${MOVEMENT_STYLE[mode.movement].label.toLowerCase()} arrow — curve it as you go.`}
       {mode.kind === "erase" && "Tap anything to rub it out."}
@@ -588,6 +625,60 @@ export default function BoardEditorPage() {
     </div>
   );
 
+  // a red round × the coach taps to delete the selected item
+  const deleteButton = (bx: number, by: number) => (
+    <g
+      transform={`translate(${Math.min(PITCH_W - 3, Math.max(3, bx))} ${Math.min(
+        PITCH_H - 3,
+        Math.max(3, by)
+      )})`}
+      onPointerDown={(e) => {
+        e.stopPropagation();
+        deleteSelected();
+      }}
+      style={{ cursor: "pointer" }}
+    >
+      <circle r={6} fill="transparent" />
+      <circle r={3.2} fill="#e11d48" stroke="#fff" strokeWidth={0.5} />
+      <line x1={-1.4} y1={-1.4} x2={1.4} y2={1.4} stroke="#fff" strokeWidth={0.8} strokeLinecap="round" />
+      <line x1={-1.4} y1={1.4} x2={1.4} y2={-1.4} stroke="#fff" strokeWidth={0.8} strokeLinecap="round" />
+    </g>
+  );
+
+  let selectionOverlay: React.ReactNode = null;
+  if (selected?.kind === "token") {
+    const t = board.tokens.find((x) => x.id === selected.id);
+    if (t) {
+      const pos = animPositions?.get(t.id) ?? t;
+      selectionOverlay = (
+        <g>
+          <circle
+            cx={pos.x}
+            cy={pos.y}
+            r={5.4}
+            fill="none"
+            stroke="#1e5b3c"
+            strokeWidth={0.7}
+            strokeDasharray="1.6 1"
+            pointerEvents="none"
+          />
+          {deleteButton(pos.x + 5.5, pos.y - 5.5)}
+        </g>
+      );
+    }
+  } else if (selected?.kind === "movement") {
+    const mv = board.movements.find((x) => x.id === selected.id);
+    if (mv && mv.points.length > 0) {
+      const mid = mv.points[Math.floor(mv.points.length / 2)];
+      selectionOverlay = (
+        <g>
+          <MovementGlyph movement={{ ...mv, id: "sel-highlight" }} preview />
+          {deleteButton(mid.x, mid.y - 5)}
+        </g>
+      );
+    }
+  }
+
   const boardContent = (
     <>
       <Pitch />
@@ -613,6 +704,7 @@ export default function BoardEditorPage() {
           </g>
         );
       })}
+      {!playing && selectionOverlay}
     </>
   );
 
