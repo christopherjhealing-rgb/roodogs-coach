@@ -1096,53 +1096,51 @@ export default function BoardEditorPage() {
       </div>
     ) : null;
 
-  const subOptions =
-    mode.kind === "place" && mode.token === "cone" ? (
-      <div className="flex flex-wrap items-center gap-1.5">
-        <span className="text-xs font-medium text-stone-500">Colour:</span>
-        {CONE_COLORS.map((c) => (
-          <button
-            key={c.fill}
-            onClick={() => setConeColor(c.fill)}
-            aria-label={`${c.name} cone`}
-            aria-pressed={coneColor === c.fill}
-            className={`h-9 w-9 rounded-full border-2 ${
-              coneColor === c.fill ? "border-pitch" : "border-stone-200"
-            }`}
-            style={{ backgroundColor: c.fill }}
-          />
-        ))}
-      </div>
-    ) : mode.kind === "place" && mode.token === "player" ? (
-      <div className="flex flex-wrap items-center gap-1.5">
-        <span className="text-xs font-medium text-stone-500">Number:</span>
+  // Shared option rows. There's a single row at the top of the toolbar: it
+  // edits the selected item when there is one, otherwise it sets the default
+  // for the active place tool — so a colour/number picker never appears twice.
+  const colourRow = (activeFill: string, onPick: (fill: string) => void) => (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <span className="text-xs font-medium text-stone-500">Colour:</span>
+      {CONE_COLORS.map((c) => (
         <button
-          onClick={() => setPlayerNum(null)}
-          aria-pressed={playerNum === null}
-          className={`min-h-[36px] rounded-full border px-2.5 text-xs font-semibold ${
-            playerNum === null
+          key={c.fill}
+          onClick={() => onPick(c.fill)}
+          aria-label={`${c.name} cone`}
+          aria-pressed={activeFill === c.fill}
+          className={`h-9 w-9 rounded-full border-2 ${
+            activeFill === c.fill ? "border-pitch" : "border-stone-200"
+          }`}
+          style={{ backgroundColor: c.fill }}
+        />
+      ))}
+    </div>
+  );
+
+  const numberRow = (
+    isActive: (n: number) => boolean,
+    onPick: (n: number) => void,
+    leading: React.ReactNode
+  ) => (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <span className="text-xs font-medium text-stone-500">Number:</span>
+      {leading}
+      {PLAYER_NUMBERS.map((n) => (
+        <button
+          key={n}
+          onClick={() => onPick(n)}
+          aria-pressed={isActive(n)}
+          className={`h-9 w-9 rounded-full border text-sm font-bold ${
+            isActive(n)
               ? "border-pitch bg-pitch text-white"
               : "border-stone-300 bg-white text-stone-600"
           }`}
         >
-          Auto
+          {n}
         </button>
-        {PLAYER_NUMBERS.map((n) => (
-          <button
-            key={n}
-            onClick={() => setPlayerNum(n)}
-            aria-pressed={playerNum === n}
-            className={`h-9 w-9 rounded-full border text-sm font-bold ${
-              playerNum === n
-                ? "border-pitch bg-pitch text-white"
-                : "border-stone-300 bg-white text-stone-600"
-            }`}
-          >
-            {n}
-          </button>
-        ))}
-      </div>
-    ) : null;
+      ))}
+    </div>
+  );
 
   const hint = (
     <p className="text-center text-xs text-stone-400">
@@ -1162,6 +1160,67 @@ export default function BoardEditorPage() {
 
   const selectedToken = soleToken();
   const selectedMovement = soleMovement();
+
+  // The single top options row — selection first, else the active place tool.
+  let optionsRow: React.ReactNode = null;
+  if (selectedToken?.type === "cone") {
+    optionsRow = colourRow(
+      selectedToken.color ?? CONE_COLORS[0].fill,
+      (fill) => recolorSelectedCone(fill)
+    );
+  } else if (selectedToken?.type === "player") {
+    const st = selectedToken;
+    optionsRow = numberRow(
+      (n) => st.label === String(n),
+      (n) => renumberSelectedPlayer(n),
+      <button
+        onClick={() => renumberSelectedPlayer(undefined)}
+        aria-label="No number"
+        className="min-h-[36px] rounded-full border border-stone-300 bg-white px-2.5 text-xs font-medium text-stone-500"
+      >
+        None
+      </button>
+    );
+  } else if (selectedMovement) {
+    const sm = selectedMovement;
+    optionsRow = (
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="text-xs font-medium text-stone-500">Type:</span>
+        {MOVEMENT_TYPES.map((m) => (
+          <button
+            key={m}
+            onClick={() => retypeSelectedMovement(m)}
+            aria-pressed={sm.type === m}
+            className={`min-h-[36px] rounded-full border px-2.5 text-xs font-semibold ${
+              sm.type === m
+                ? "border-pitch bg-pitch text-white"
+                : "border-stone-300 bg-white text-stone-600"
+            }`}
+          >
+            {MOVEMENT_STYLE[m].label}
+          </button>
+        ))}
+      </div>
+    );
+  } else if (mode.kind === "place" && mode.token === "cone") {
+    optionsRow = colourRow(coneColor, (fill) => setConeColor(fill));
+  } else if (mode.kind === "place" && mode.token === "player") {
+    optionsRow = numberRow(
+      (n) => playerNum === n,
+      (n) => setPlayerNum(n),
+      <button
+        onClick={() => setPlayerNum(null)}
+        aria-pressed={playerNum === null}
+        className={`min-h-[36px] rounded-full border px-2.5 text-xs font-semibold ${
+          playerNum === null
+            ? "border-pitch bg-pitch text-white"
+            : "border-stone-300 bg-white text-stone-600"
+        }`}
+      >
+        Auto
+      </button>
+    );
+  }
 
   const selectedLabel = (() => {
     if (!selected) return "";
@@ -1201,70 +1260,6 @@ export default function BoardEditorPage() {
           </button>
         </div>
       </div>
-      {selectedToken?.type === "cone" && (
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-xs font-medium text-stone-500">Colour:</span>
-          {CONE_COLORS.map((c) => (
-            <button
-              key={c.fill}
-              onClick={() => recolorSelectedCone(c.fill)}
-              aria-label={`${c.name} cone`}
-              aria-pressed={selectedToken.color === c.fill}
-              className={`h-8 w-8 rounded-full border-2 ${
-                (selectedToken.color ?? CONE_COLORS[0].fill) === c.fill
-                  ? "border-pitch"
-                  : "border-stone-200"
-              }`}
-              style={{ backgroundColor: c.fill }}
-            />
-          ))}
-        </div>
-      )}
-      {selectedToken?.type === "player" && (
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-xs font-medium text-stone-500">Number:</span>
-          {PLAYER_NUMBERS.map((n) => (
-            <button
-              key={n}
-              onClick={() => renumberSelectedPlayer(n)}
-              aria-pressed={selectedToken.label === String(n)}
-              className={`h-8 w-8 rounded-full border text-xs font-bold ${
-                selectedToken.label === String(n)
-                  ? "border-pitch bg-pitch text-white"
-                  : "border-stone-300 bg-white text-stone-600"
-              }`}
-            >
-              {n}
-            </button>
-          ))}
-          <button
-            onClick={() => renumberSelectedPlayer(undefined)}
-            aria-label="No number"
-            className="min-h-[32px] rounded-full border border-stone-300 bg-white px-2 text-xs font-medium text-stone-500"
-          >
-            None
-          </button>
-        </div>
-      )}
-      {selectedMovement && (
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-xs font-medium text-stone-500">Type:</span>
-          {MOVEMENT_TYPES.map((m) => (
-            <button
-              key={m}
-              onClick={() => retypeSelectedMovement(m)}
-              aria-pressed={selectedMovement.type === m}
-              className={`min-h-[32px] rounded-full border px-2.5 text-xs font-semibold ${
-                selectedMovement.type === m
-                  ? "border-pitch bg-pitch text-white"
-                  : "border-stone-300 bg-white text-stone-600"
-              }`}
-            >
-              {MOVEMENT_STYLE[m].label}
-            </button>
-          ))}
-        </div>
-      )}
     </div>
   ) : null;
 
@@ -1663,7 +1658,7 @@ export default function BoardEditorPage() {
               {paletteButtons}
             </div>
             {boardSettings}
-            {subOptions}
+            {optionsRow}
             {selectionBar}
             {hint}
             {legend}
@@ -1682,7 +1677,7 @@ export default function BoardEditorPage() {
             {paletteButtons}
           </div>
           {boardSettings}
-          {subOptions}
+          {optionsRow}
           {selectionBar}
           {hint}
           {canvas}
