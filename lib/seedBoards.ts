@@ -694,4 +694,199 @@ export const SEED_BOARDS: Board[] = [
       pass([{ x: 50, y: 94 }, { x: 50, y: 120 }]),
     ]
   ),
+
+  // — Gap-filling drill diagrams —
+  mk(
+    "seed-board-grubber-gates",
+    "Grubber Gates — setup",
+    [
+      P(35, 98, "1"),
+      BALL(35, 94),
+      C(29, 70, YELLOW),
+      C(41, 70, YELLOW),
+      P(35, 44, "2"),
+      P(65, 98, "3"),
+      BALL(65, 94),
+      C(59, 70, YELLOW),
+      C(71, 70, YELLOW),
+      P(65, 44, "4"),
+    ],
+    [
+      kick([{ x: 35, y: 92 }, { x: 35, y: 50 }]),
+      kick([{ x: 65, y: 92 }, { x: 65, y: 50 }]),
+    ]
+  ),
+  mk(
+    "seed-board-high-ball",
+    "High Ball Catch — setup",
+    [P(50, 106, "1"), BALL(50, 102), P(50, 62, "2")],
+    [
+      kick([
+        { x: 50, y: 100 },
+        { x: 46, y: 76 },
+        { x: 50, y: 58 },
+      ]),
+      { type: "jump", points: [{ x: 50, y: 66 }, { x: 50, y: 56 }] },
+    ]
+  ),
+  mk(
+    "seed-board-defence-line",
+    "Defensive Line — setup",
+    [
+      P(30, 90, "1"),
+      P(43, 90, "2"),
+      P(56, 90, "3"),
+      P(69, 90, "4"),
+      O(35, 55),
+      O(50, 55),
+      O(65, 55),
+      BALL(35, 58),
+    ],
+    [
+      run([{ x: 30, y: 88 }, { x: 30, y: 72 }]),
+      run([{ x: 43, y: 88 }, { x: 43, y: 72 }]),
+      run([{ x: 56, y: 88 }, { x: 56, y: 72 }]),
+      run([{ x: 69, y: 88 }, { x: 69, y: 72 }]),
+    ]
+  ),
+  mk(
+    "seed-board-tackle-tracking",
+    "Tackle Tracking — setup",
+    [
+      ...channel(34, 66, 44, 100, 2),
+      P(50, 94, "1"),
+      BALL(50, 94),
+      P(50, 50, "2"),
+    ],
+    [
+      run([
+        { x: 50, y: 92 },
+        { x: 42, y: 78 },
+        { x: 56, y: 64 },
+      ]),
+      run([
+        { x: 50, y: 54 },
+        { x: 46, y: 66 },
+        { x: 53, y: 72 },
+      ]),
+    ]
+  ),
+  mk(
+    "seed-board-offload",
+    "Offload — setup",
+    [
+      BAG(50, 70),
+      P(44, 96, "1"),
+      BALL(44, 96),
+      P(60, 102, "2"),
+    ],
+    [
+      run([{ x: 44, y: 94 }, { x: 48, y: 76 }]),
+      run([{ x: 60, y: 100 }, { x: 57, y: 78 }]),
+      pass([{ x: 50, y: 73 }, { x: 56, y: 76 }]),
+    ]
+  ),
+  mk(
+    "seed-board-pass-loop",
+    "Pass and Loop — setup",
+    [P(40, 92, "1"), BALL(40, 92), P(56, 92, "2")],
+    [
+      pass([{ x: 42, y: 90 }, { x: 54, y: 90 }]),
+      run([
+        { x: 40, y: 90 },
+        { x: 48, y: 98 },
+        { x: 58, y: 96 },
+        { x: 66, y: 86 },
+      ]),
+      pass([{ x: 58, y: 88 }, { x: 64, y: 85 }]),
+    ]
+  ),
+  mk(
+    "seed-board-scoop-and-score",
+    "Scoop and Score — setup",
+    [
+      C(30, 50, YELLOW),
+      C(50, 50, YELLOW),
+      C(70, 50, YELLOW),
+      BALL(40, 75),
+      BALL(60, 75),
+      P(40, 102, "1"),
+      P(60, 102, "2"),
+    ],
+    [
+      run([{ x: 40, y: 100 }, { x: 40, y: 54 }]),
+      run([{ x: 60, y: 100 }, { x: 60, y: 54 }]),
+    ]
+  ),
+  mk(
+    "seed-board-ball-wizards",
+    "Ball Wizards — setup",
+    [
+      ...square(50, 70, 20),
+      P(40, 62, "1"),
+      BALL(44, 62),
+      P(60, 62, "2"),
+      BALL(64, 62),
+      P(40, 80, "3"),
+      BALL(44, 80),
+      P(60, 80, "4"),
+      BALL(64, 80),
+    ],
+    []
+  ),
+  mk(
+    "seed-board-numbers-game",
+    "Numbers Game — setup",
+    [
+      ...square(50, 70, 26),
+      C(44, 70, RED),
+      C(56, 70, RED),
+      P(38, 92, "1"),
+      P(50, 94, "2"),
+      P(62, 92, "3"),
+      O(44, 52),
+      O(58, 52),
+      BALL(50, 90),
+    ],
+    [run([{ x: 50, y: 92 }, { x: 50, y: 58 }])]
+  ),
+  mk(
+    "seed-board-tap-and-go",
+    "Tap and Go — setup",
+    [
+      BALL(50, 92),
+      P(50, 98, "1"),
+      P(40, 104, "2"),
+      P(60, 104, "3"),
+      O(44, 62),
+      O(56, 62),
+    ],
+    [
+      run([{ x: 50, y: 90 }, { x: 50, y: 72 }]),
+      run([{ x: 40, y: 102 }, { x: 44, y: 80 }]),
+      run([{ x: 60, y: 102 }, { x: 56, y: 80 }]),
+    ]
+  ),
+  mk(
+    "seed-board-rats-rabbits",
+    "Rats and Rabbits — setup",
+    [
+      C(20, 56, YELLOW),
+      C(20, 70, YELLOW),
+      C(20, 84, YELLOW),
+      C(80, 56, BLUE),
+      C(80, 70, BLUE),
+      C(80, 84, BLUE),
+      P(46, 56, "1"),
+      P(46, 70, "2"),
+      P(46, 84, "3"),
+      P(54, 56, "4"),
+      P(54, 70, "5"),
+      P(54, 84, "6"),
+    ],
+    [
+      run([{ x: 44, y: 70 }, { x: 26, y: 70 }]),
+      run([{ x: 54, y: 68 }, { x: 34, y: 68 }]),
+    ]
+  ),
 ];

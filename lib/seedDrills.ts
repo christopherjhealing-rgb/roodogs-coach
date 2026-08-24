@@ -380,4 +380,128 @@ export const SEED_DRILLS: Drill[] = [
     easier: "Grubber kick and walk-chase to gather",
     harder: "Chase in a line of three; first to the ball calls 'mine'",
   },
+
+  // — Round three: filling the gaps (kicking, defence, offloads, support,
+  //   ground ball, decision making, restarts) —
+  {
+    id: "seed-grubber-gates",
+    name: "Grubber Through the Gates",
+    tags: ["kicking"],
+    durationMins: 8,
+    equipment: "1 ball per pair, cones for gates",
+    description:
+      "Pairs face each other with a cone gate in between. Grubber kick along the ground through the gate to your partner — ball in two hands, drop it onto the laces, follow through low so it stays down. Ten each, count the clean ones.",
+    easier: "Wider gate, kick from standing",
+    harder: "Narrower gate, kick on the move; weaker foot round",
+  },
+  {
+    id: "seed-high-ball",
+    name: "High Ball: Catch and Call",
+    tags: ["kicking"],
+    durationMins: 8,
+    equipment: "Balls",
+    description:
+      "One player lofts a gentle high kick; the catcher calls 'MINE!' early and loud, gets under it with hands up making a basket, and jumps to catch at the highest point. Soft landings — knees bent. Swap roles.",
+    easier: "Underarm lobs, catch with feet on the ground",
+    harder: "Higher kicks with a jump; add a gentle chaser closing in",
+  },
+  {
+    id: "seed-defence-line",
+    name: "Defensive Line: Up Together",
+    tags: ["tackling"],
+    durationMins: 10,
+    equipment: "Cones, bibs",
+    description:
+      "Four defenders on a line, connected by talk. On 'UP!' the whole line moves forward together — nobody shoots out, nobody hangs back — then drifts across as the attack shifts the ball. Two-hand touch to finish. The line wins together.",
+    easier: "Walk pace, no attackers — just moving up in a line",
+    harder: "Live attack with a spare attacker; defence must drift to cover",
+  },
+  {
+    id: "seed-tackle-tracking",
+    name: "Tackle Tracking (Shadow)",
+    tags: ["tackling", "evasion"],
+    durationMins: 8,
+    equipment: "Balls, cones for a channel",
+    description:
+      "Defender starts opposite the ball carrier and tracks them across the channel — small steps, eyes on the hips not the ball, staying just inside the attacker's shoulder so there's no cut-back. Start as shadowing only, then two-hand touch, then tackle.",
+    easier: "Shadow only, attacker at a jog",
+    harder: "Full evasion allowed; finish with a safe side-on tackle",
+  },
+  {
+    id: "seed-offload",
+    name: "Offload in the Tackle",
+    tags: ["passing", "tackling"],
+    durationMins: 10,
+    equipment: "Tackle bags or shields, balls",
+    description:
+      "Carrier runs into a soft shield, stays on their feet and keeps the ball alive — a little pop pass out the back or side to the support runner arriving with hands up and calling. Support timing is the skill: arrive late and loud.",
+    easier: "Carrier stops at the shield and pops from standing",
+    harder: "Shield pushes back; support starts further away",
+  },
+  {
+    id: "seed-pass-loop",
+    name: "Pass and Loop",
+    tags: ["passing", "fitness"],
+    durationMins: 8,
+    equipment: "1 ball per pair, cones",
+    description:
+      "Pass to your partner, then run a loop around behind them to take the return ball on the outside. It's the simplest 2-on-1 beater in rugby — pass, chase your pass, call for it back. Up the channel and back.",
+    easier: "Walking pace, short passes",
+    harder: "At a run against a drifting defender",
+  },
+  {
+    id: "seed-scoop-and-score",
+    name: "Scoop and Score",
+    tags: ["passing", "fitness", "fun"],
+    durationMins: 6,
+    equipment: "Balls on the ground, cones for a try line",
+    description:
+      "Balls scattered on the grass. Run on, scoop a ball up at pace without stopping — bend at the knees, two hands, eyes on the ball — and score over the line. Loose balls win games; make picking them up automatic.",
+    easier: "Walk to the ball, straddle and pick",
+    harder: "Rolling balls; race a partner to the same ball",
+  },
+  {
+    id: "seed-ball-wizards",
+    name: "Ball Wizards",
+    tags: ["warmup", "fun"],
+    durationMins: 5,
+    equipment: "1 ball each",
+    description:
+      "Ball-familiarity circuit: pass the ball around your waist, figure-8 through the legs, flip it up and catch, roll it and re-gather. Races and challenges — who can do ten waist-loops first? Sneaky handling practice disguised as mucking about.",
+    easier: "Big slow circles, ball never leaves the hands",
+    harder: "Eyes closed for waist loops; flip, clap, catch",
+  },
+  {
+    id: "seed-numbers-game",
+    name: "Numbers Game",
+    tags: ["evasion", "passing", "fun"],
+    durationMins: 10,
+    equipment: "Balls, cones, bibs",
+    description:
+      "Everyone jogs around the square. Coach calls a number — '3 v 2!' — and the first three through the attack gate play the first two through the defence gate. Instant decisions: where's the space, who's spare? Then everyone's back jogging.",
+    easier: "Always give attack the extra player",
+    harder: "Call even numbers, or '2 v 3' so attack must beat the odds",
+  },
+  {
+    id: "seed-tap-and-go",
+    name: "Tap Penalty: Tap and Go",
+    tags: ["setpiece", "passing"],
+    durationMins: 8,
+    equipment: "Balls, cones, shields for defenders",
+    description:
+      "Free kicks and penalties are tap restarts at this age — and a fast tap is worth a try a game. Tap the ball on the mark with the foot, pick it and go straight away, with two support runners already moving either side. Defence must be back — punish slow retreats.",
+    easier: "Walk through the tap-pick-run sequence",
+    harder: "Add retreating defenders; first carrier must draw then pass",
+  },
+  {
+    id: "seed-rats-rabbits",
+    name: "Rats and Rabbits",
+    tags: ["warmup", "fitness", "fun"],
+    durationMins: 6,
+    equipment: "Cones for two safe lines",
+    description:
+      "Two lines stand back to back — Rats on one side, Rabbits on the other. Coach calls 'RRRRR…ats!' — the called team sprints for their safe line while the others turn and chase. Reaction, acceleration, and lots of giggles.",
+    easier: "Bigger head start to the safe line",
+    harder: "Start lying down or facing away; tag before the line",
+  },
 ];
