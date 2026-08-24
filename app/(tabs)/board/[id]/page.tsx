@@ -62,16 +62,10 @@ const selMeasures = (ids: string[]): Selection => ({
 const selCount = (s: Selection | null): number =>
   s ? s.tokens.length + s.movements.length + s.measures.length : 0;
 
-const TOKEN_TYPES: TokenType[] = [
-  "player",
-  "opponent",
-  "dad",
-  "cone",
-  "hurdle",
-  "bag",
-  "pad",
-  "ball",
-];
+// Toolbar groups — collapsed into dropdowns so the whole palette fits on a
+// phone without sideways scrolling.
+const PEOPLE_TOKENS: TokenType[] = ["player", "opponent", "dad"];
+const EQUIP_TOKENS: TokenType[] = ["cone", "hurdle", "bag", "pad", "ball"];
 
 const MOVEMENT_TYPES: MovementType[] = [
   "run",
@@ -124,6 +118,10 @@ export default function BoardEditorPage() {
   const [board, setBoard] = useState<Board | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [mode, setMode] = useState<Mode>({ kind: "move" });
+  // which palette dropdown is open (People / Equipment / Arrows), if any
+  const [openMenu, setOpenMenu] = useState<
+    "people" | "equipment" | "arrows" | null
+  >(null);
   const [undoStack, setUndoStack] = useState<Snapshot[]>([]);
   const [coneColor, setConeColor] = useState(CONE_COLORS[0].fill);
   // null = automatic numbering (next free number)
@@ -165,6 +163,17 @@ export default function BoardEditorPage() {
   const marqueeStart = useRef<Pt | null>(null);
   const [marquee, setMarquee] = useState<{ a: Pt; b: Pt } | null>(null);
 
+  // pinch-to-zoom: the visible viewBox rect (in the SVG's own coordinate
+  // space), null = fitted to the whole pitch. Live pointers and pinch anchor.
+  type Rect = { x: number; y: number; w: number; h: number };
+  const [zoomView, setZoomView] = useState<Rect | null>(null);
+  const pointers = useRef<Map<number, Pt>>(new Map());
+  const pinch = useRef<{
+    startDist: number;
+    startMid: Pt;
+    startView: Rect;
+  } | null>(null);
+
   // mouse hover position on the pitch — drives the ghost preview in place
   // mode (never set for touch, so phones are unaffected)
   const [hoverPos, setHoverPos] = useState<Pt | null>(null);
@@ -172,6 +181,18 @@ export default function BoardEditorPage() {
   useEffect(() => {
     setHoverPos(null);
   }, [mode]);
+
+  // close an open palette dropdown when tapping anywhere outside the palette
+  // (including the canvas, so placing a tool dismisses the menu)
+  useEffect(() => {
+    if (!openMenu) return;
+    const onDown = (e: PointerEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (!t?.closest?.("[data-palette]")) setOpenMenu(null);
+    };
+    document.addEventListener("pointerdown", onDown);
+    return () => document.removeEventListener("pointerdown", onDown);
+  }, [openMenu]);
 
   // play-animation state: token id → animated position
   const [playing, setPlaying] = useState(false);
@@ -419,22 +440,86 @@ export default function BoardEditorPage() {
     // handlers close over current board/selection/undo state
   });
 
-  /** Screen position → pitch coordinates, in either orientation. */
-  function toPitch(e: React.PointerEvent): Pt {
+  // The SVG viewBox when fully zoomed out — pitch space in portrait, the
+  // rotated space in landscape.
+  const baseView: Rect = landscape
+    ? { x: 0, y: 0, w: PITCH_H, h: PITCH_W }
+    : { x: 0, y: 0, w: PITCH_W, h: PITCH_H };
+  const view = zoomView ?? baseView;
+
+  // reset the zoom whenever the orientation flips (their view boxes differ)
+  useEffect(() => {
+    setZoomView(null);
+    pinch.current = null;
+  }, [landscape]);
+
+  /** Screen position → pitch coordinates, honouring zoom and orientation. */
+  function screenToPitch(clientX: number, clientY: number): Pt {
     const rect = svgRef.current!.getBoundingClientRect();
-    if (landscape) {
-      // landscape view is the portrait pitch rotated 90° anticlockwise
-      const u = ((e.clientX - rect.left) / rect.width) * PITCH_H;
-      const v = ((e.clientY - rect.top) / rect.height) * PITCH_W;
-      return {
-        x: Math.min(PITCH_W, Math.max(0, PITCH_W - v)),
-        y: Math.min(PITCH_H, Math.max(0, u)),
-      };
-    }
+    // into the SVG's own coordinate space via the current viewBox
+    const sx = view.x + ((clientX - rect.left) / rect.width) * view.w;
+    const sy = view.y + ((clientY - rect.top) / rect.height) * view.h;
+    // landscape draws the portrait pitch rotated 90° anticlockwise
+    const px = landscape ? PITCH_W - sy : sx;
+    const py = landscape ? sx : sy;
     return {
-      x: Math.min(PITCH_W, Math.max(0, ((e.clientX - rect.left) / rect.width) * PITCH_W)),
-      y: Math.min(PITCH_H, Math.max(0, ((e.clientY - rect.top) / rect.height) * PITCH_H)),
+      x: Math.min(PITCH_W, Math.max(0, px)),
+      y: Math.min(PITCH_H, Math.max(0, py)),
     };
+  }
+
+  function toPitch(e: React.PointerEvent): Pt {
+    return screenToPitch(e.clientX, e.clientY);
+  }
+
+  /** Distance and midpoint (screen px) of the two active pointers. */
+  function pinchGeom() {
+    const pts = [...pointers.current.values()];
+    const [a, b] = pts;
+    return {
+      dist: Math.hypot(a.x - b.x, a.y - b.y) || 1,
+      mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 },
+    };
+  }
+
+  /** A second finger landed — abandon any one-finger action and start a pinch. */
+  function beginPinch() {
+    drawPoints.current = [];
+    setPreview(null);
+    marqueeStart.current = null;
+    setMarquee(null);
+    measureStart.current = null;
+    setMeasurePreview(null);
+    drag.current = null;
+    dragUndoTaken.current = false;
+    const { dist, mid } = pinchGeom();
+    pinch.current = { startDist: dist, startMid: mid, startView: view };
+  }
+
+  /** Update the zoom rect from the live pinch — scale about the midpoint and
+   *  pan with it, clamped so the pitch always fills the frame. */
+  function applyPinch() {
+    if (!pinch.current || !svgRef.current) return;
+    const rect = svgRef.current.getBoundingClientRect();
+    const { dist, mid } = pinchGeom();
+    const sv = pinch.current.startView;
+    const scale = pinch.current.startDist / dist;
+    const w = Math.max(baseView.w / 4, Math.min(baseView.w, sv.w * scale));
+    const h = w * (baseView.h / baseView.w);
+    const ax =
+      sv.x + ((pinch.current.startMid.x - rect.left) / rect.width) * sv.w;
+    const ay =
+      sv.y + ((pinch.current.startMid.y - rect.top) / rect.height) * sv.h;
+    let x = ax - ((mid.x - rect.left) / rect.width) * w;
+    let y = ay - ((mid.y - rect.top) / rect.height) * h;
+    x = Math.max(0, Math.min(baseView.w - w, x));
+    y = Math.max(0, Math.min(baseView.h - h, y));
+    setZoomView({ x, y, w, h });
+  }
+
+  function onCanvasPointerCancel(e: React.PointerEvent) {
+    pointers.current.delete(e.pointerId);
+    if (pointers.current.size < 2) pinch.current = null;
   }
 
   function nextAutoNumber(tokens: BoardToken[]): number {
@@ -451,7 +536,13 @@ export default function BoardEditorPage() {
   const snapStep = snap ? stepU : false;
 
   function onCanvasPointerDown(e: React.PointerEvent) {
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (!board || playing) return;
+    // two fingers → pinch-zoom, cancelling any one-finger action
+    if (pointers.current.size >= 2) {
+      beginPinch();
+      return;
+    }
     const p = toPitch(e);
     if (mode.kind === "move") {
       // drag on empty pitch draws a marquee to select several at once;
@@ -503,6 +594,12 @@ export default function BoardEditorPage() {
   }
 
   function onCanvasPointerMove(e: React.PointerEvent) {
+    if (pointers.current.has(e.pointerId))
+      pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pinch.current && pointers.current.size >= 2) {
+      applyPinch();
+      return;
+    }
     if (!board || playing) return;
     const p = toPitch(e);
     // ghost preview follows the mouse in place mode
@@ -586,6 +683,12 @@ export default function BoardEditorPage() {
   }
 
   function onCanvasPointerUp(e: React.PointerEvent) {
+    pointers.current.delete(e.pointerId);
+    // finishing (or breaking) a pinch — don't fall through to draw/select
+    if (pinch.current) {
+      if (pointers.current.size < 2) pinch.current = null;
+      return;
+    }
     if (drag.current) {
       drag.current = null;
       return;
@@ -773,69 +876,162 @@ export default function BoardEditorPage() {
         : "border-stone-300 bg-white text-stone-600"
     }`;
 
+  const tokenIcon = (t: TokenType) => (
+    <svg viewBox="-5 -5 10 10" className="h-5 w-5">
+      <TokenGlyph token={{ id: "icon", type: t, x: 0, y: 0, label: "1" }} />
+    </svg>
+  );
+
+  const movementIcon = (m: MovementType) => (
+    <svg viewBox="0 0 24 12" className="h-5 w-6 rounded bg-pitch-dark">
+      {m === "draw" ? (
+        <path
+          d="M3 8 Q7 2 11 7 T19 6"
+          fill="none"
+          stroke={MOVEMENT_STYLE[m].color}
+          strokeWidth={2}
+          strokeLinecap="round"
+        />
+      ) : (
+        <>
+          <line
+            x1={3}
+            y1={6}
+            x2={17}
+            y2={6}
+            stroke={MOVEMENT_STYLE[m].color}
+            strokeWidth={2}
+            strokeDasharray={MOVEMENT_STYLE[m].dash
+              ?.split(" ")
+              .map((n) => Number(n) * 1.8)
+              .join(" ")}
+          />
+          <polygon points="21,6 16,3.5 16,8.5" fill={MOVEMENT_STYLE[m].color} />
+        </>
+      )}
+    </svg>
+  );
+
+  // Which tool each dropdown currently holds (drives its label + highlight).
+  const activePerson =
+    mode.kind === "place" && PEOPLE_TOKENS.includes(mode.token)
+      ? mode.token
+      : null;
+  const activeEquip =
+    mode.kind === "place" && EQUIP_TOKENS.includes(mode.token)
+      ? mode.token
+      : null;
+  const activeArrow = mode.kind === "draw" ? mode.movement : null;
+
+  const caret = (
+    <svg viewBox="0 0 10 6" className="h-1.5 w-2.5" aria-hidden>
+      <path d="M1 1 L5 5 L9 1" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+
+  // A palette dropdown: trigger chip + a panel of tool options below it.
+  const dropdown = (
+    id: "people" | "equipment" | "arrows",
+    ariaLabel: string,
+    fallbackLabel: string,
+    triggerIcon: React.ReactNode,
+    active: boolean,
+    options: React.ReactNode
+  ) => (
+    <div className="relative">
+      <button
+        onClick={() => setOpenMenu((v) => (v === id ? null : id))}
+        aria-expanded={openMenu === id}
+        aria-label={ariaLabel}
+        className={toolChip(active)}
+      >
+        {triggerIcon}
+        <span className="flex items-center gap-0.5">
+          {fallbackLabel}
+          {caret}
+        </span>
+      </button>
+      {openMenu === id && (
+        <div className="absolute left-0 top-full z-30 mt-1 grid w-[172px] grid-cols-3 gap-1 rounded-xl border border-stone-200 bg-white p-1.5 shadow-lg">
+          {options}
+        </div>
+      )}
+    </div>
+  );
+
+  const placeOption = (t: TokenType) => (
+    <button
+      key={t}
+      onClick={() => {
+        setMode({ kind: "place", token: t });
+        setOpenMenu(null);
+      }}
+      className={toolChip(mode.kind === "place" && mode.token === t)}
+    >
+      {tokenIcon(t)}
+      {TOKEN_LABELS[t]}
+    </button>
+  );
+
+  const arrowOption = (m: MovementType) => (
+    <button
+      key={m}
+      onClick={() => {
+        setMode({ kind: "draw", movement: m });
+        setOpenMenu(null);
+      }}
+      className={toolChip(mode.kind === "draw" && mode.movement === m)}
+    >
+      {movementIcon(m)}
+      {MOVEMENT_STYLE[m].label}
+    </button>
+  );
+
   const paletteButtons = (
     <>
       <button
-        onClick={() => setMode({ kind: "move" })}
+        onClick={() => {
+          setMode({ kind: "move" });
+          setOpenMenu(null);
+        }}
         className={toolChip(mode.kind === "move")}
       >
         <MoveIcon className="h-5 w-5" />
         Move
       </button>
-      {TOKEN_TYPES.map((t) => (
-        <button
-          key={t}
-          onClick={() => setMode({ kind: "place", token: t })}
-          className={toolChip(mode.kind === "place" && mode.token === t)}
-        >
-          <svg viewBox="-5 -5 10 10" className="h-5 w-5">
-            <TokenGlyph token={{ id: "icon", type: t, x: 0, y: 0, label: "1" }} />
-          </svg>
-          {TOKEN_LABELS[t]}
-        </button>
-      ))}
-      {MOVEMENT_TYPES.map((m) => (
-        <button
-          key={m}
-          onClick={() => setMode({ kind: "draw", movement: m })}
-          className={toolChip(mode.kind === "draw" && mode.movement === m)}
-        >
-          <svg viewBox="0 0 24 12" className="h-5 w-6 rounded bg-pitch-dark">
-            {m === "draw" ? (
-              // freehand squiggle, no arrowhead
-              <path
-                d="M3 8 Q7 2 11 7 T19 6"
-                fill="none"
-                stroke={MOVEMENT_STYLE[m].color}
-                strokeWidth={2}
-                strokeLinecap="round"
-              />
-            ) : (
-              <>
-                <line
-                  x1={3}
-                  y1={6}
-                  x2={17}
-                  y2={6}
-                  stroke={MOVEMENT_STYLE[m].color}
-                  strokeWidth={2}
-                  strokeDasharray={MOVEMENT_STYLE[m].dash
-                    ?.split(" ")
-                    .map((n) => Number(n) * 1.8)
-                    .join(" ")}
-                />
-                <polygon
-                  points="21,6 16,3.5 16,8.5"
-                  fill={MOVEMENT_STYLE[m].color}
-                />
-              </>
-            )}
-          </svg>
-          {MOVEMENT_STYLE[m].label}
-        </button>
-      ))}
+
+      {dropdown(
+        "people",
+        "People tools",
+        activePerson ? TOKEN_LABELS[activePerson] : "People",
+        tokenIcon(activePerson ?? "player"),
+        activePerson != null,
+        PEOPLE_TOKENS.map(placeOption)
+      )}
+
+      {dropdown(
+        "equipment",
+        "Equipment tools",
+        activeEquip ? TOKEN_LABELS[activeEquip] : "Equipment",
+        tokenIcon(activeEquip ?? "cone"),
+        activeEquip != null,
+        EQUIP_TOKENS.map(placeOption)
+      )}
+
+      {dropdown(
+        "arrows",
+        "Arrow tools",
+        activeArrow ? MOVEMENT_STYLE[activeArrow].label : "Arrows",
+        movementIcon(activeArrow ?? "run"),
+        activeArrow != null,
+        MOVEMENT_TYPES.map(arrowOption)
+      )}
+
       <button
-        onClick={() => setMode({ kind: "measure" })}
+        onClick={() => {
+          setMode({ kind: "measure" });
+          setOpenMenu(null);
+        }}
         className={toolChip(mode.kind === "measure")}
       >
         <svg viewBox="0 0 24 12" className="h-5 w-6">
@@ -847,8 +1043,12 @@ export default function BoardEditorPage() {
         </svg>
         Distance
       </button>
+
       <button
-        onClick={() => setMode({ kind: "erase" })}
+        onClick={() => {
+          setMode({ kind: "erase" });
+          setOpenMenu(null);
+        }}
         className={toolChip(mode.kind === "erase")}
       >
         <EraseIcon className="h-5 w-5" />
@@ -1337,10 +1537,21 @@ export default function BoardEditorPage() {
       ? "cursor-crosshair"
       : "";
 
-  const canvas = landscape ? (
+  const viewBoxStr = `${view.x} ${view.y} ${view.w} ${view.h}`;
+  const zoomedIn = zoomView != null && view.w < baseView.w - 0.01;
+  const zoomResetBtn = zoomedIn ? (
+    <button
+      onClick={() => setZoomView(null)}
+      className="absolute bottom-2 right-2 z-10 rounded-lg bg-black/60 px-2.5 py-1 text-xs font-semibold text-white shadow"
+    >
+      Reset zoom
+    </button>
+  ) : null;
+
+  const svgEl = landscape ? (
     <svg
       ref={svgRef}
-      viewBox={`0 0 ${PITCH_H} ${PITCH_W}`}
+      viewBox={viewBoxStr}
       className={`mx-auto touch-none select-none rounded-xl shadow-sm ${canvasCursor}`}
       style={{
         aspectRatio: `${PITCH_H} / ${PITCH_W}`,
@@ -1349,6 +1560,7 @@ export default function BoardEditorPage() {
       onPointerDown={onCanvasPointerDown}
       onPointerMove={onCanvasPointerMove}
       onPointerUp={onCanvasPointerUp}
+      onPointerCancel={onCanvasPointerCancel}
       onPointerLeave={() => setHoverPos(null)}
       data-testid="board-canvas"
       data-orientation="landscape"
@@ -1358,18 +1570,26 @@ export default function BoardEditorPage() {
   ) : (
     <svg
       ref={svgRef}
-      viewBox={`0 0 ${PITCH_W} ${PITCH_H}`}
+      viewBox={viewBoxStr}
       className={`w-full touch-none select-none rounded-xl shadow-sm ${canvasCursor}`}
       style={{ aspectRatio: `${PITCH_W} / ${PITCH_H}` }}
       onPointerDown={onCanvasPointerDown}
       onPointerMove={onCanvasPointerMove}
       onPointerUp={onCanvasPointerUp}
+      onPointerCancel={onCanvasPointerCancel}
       onPointerLeave={() => setHoverPos(null)}
       data-testid="board-canvas"
       data-orientation="portrait"
     >
       {boardContent}
     </svg>
+  );
+
+  const canvas = (
+    <div className="relative">
+      {svgEl}
+      {zoomResetBtn}
+    </div>
   );
 
   return (
@@ -1439,7 +1659,9 @@ export default function BoardEditorPage() {
       {landscape ? (
         <div className="flex flex-1 items-start justify-center gap-4">
           <div className="flex w-[240px] shrink-0 flex-col gap-2">
-            <div className="flex flex-wrap gap-1.5">{paletteButtons}</div>
+            <div data-palette className="flex flex-wrap gap-1.5">
+              {paletteButtons}
+            </div>
             {boardSettings}
             {subOptions}
             {selectionBar}
@@ -1456,8 +1678,8 @@ export default function BoardEditorPage() {
         </div>
       ) : (
         <>
-          <div className="-mx-4 overflow-x-auto px-4">
-            <div className="flex w-max gap-1.5">{paletteButtons}</div>
+          <div data-palette className="flex flex-wrap gap-1.5">
+            {paletteButtons}
           </div>
           {boardSettings}
           {subOptions}

@@ -74,7 +74,12 @@ Five bottom-nav tabs, components colocated by feature under `app/(tabs)/`:
    animates tokens along their arrows (nearest token to an arrow's start
    gets paired with it), ⤴ shares the board as a PNG, cones have a colour
    picker, players a number picker, and there's a Dad token for helpers.
-   Landscape layout on wide screens plus a fullscreen button.
+   Landscape layout on wide screens plus a fullscreen button. The palette
+   collapses into **People / Equipment / Arrows** dropdowns (each with a stable
+   `aria-label`) so the whole toolbar fits a phone without sideways scrolling;
+   Move, Distance and Erase stay as direct buttons. **Two-finger pinch** zooms
+   and pans the pitch (implemented by driving the SVG `viewBox`, so pointer↔pitch
+   maths stays exact at any zoom; a "Reset zoom" button appears when zoomed).
    Boards carry a real-world width (`widthM`, default 40 m); the Distance
    tool draws dimension lines labelled in metres, and grid lock snaps at a
    selectable 1/2/5 m step derived from that width. In Move mode a drag
