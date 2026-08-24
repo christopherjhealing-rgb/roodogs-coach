@@ -7,6 +7,7 @@ import { EraseIcon, MoveIcon } from "@/components/NavIcon";
 import { newId, storage } from "@/lib/storage";
 import type {
   Board,
+  BoardMeasure,
   BoardMovement,
   BoardToken,
   MovementType,
@@ -15,6 +16,7 @@ import type {
 import {
   CONE_COLORS,
   MOVEMENT_STYLE,
+  MeasureGlyph,
   MovementGlyph,
   PITCH_H,
   PITCH_W,
@@ -29,8 +31,14 @@ import { runSequentialPlay } from "../boardPlay";
 type Mode =
   | { kind: "move" }
   | { kind: "erase" }
+  | { kind: "measure" }
   | { kind: "place"; token: TokenType }
   | { kind: "draw"; movement: MovementType };
+
+type Selection =
+  | { kind: "tokens"; ids: string[] }
+  | { kind: "movement"; id: string }
+  | { kind: "measure"; id: string };
 
 const TOKEN_TYPES: TokenType[] = [
   "player",
@@ -51,11 +59,15 @@ const MOVEMENT_TYPES: MovementType[] = [
 ];
 
 const PLAYER_NUMBERS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+const GRID_STEPS_M = [1, 2, 5];
 
 interface Snapshot {
   tokens: BoardToken[];
   movements: BoardMovement[];
+  measures: BoardMeasure[];
 }
+
+type Pt = { x: number; y: number };
 
 export default function BoardEditorPage() {
   const params = useParams<{ id: string }>();
@@ -70,6 +82,8 @@ export default function BoardEditorPage() {
   const [playerNum, setPlayerNum] = useState<number | null>(null);
   // grid lock — snap placement/moves to the grid so cones line up
   const [snap, setSnap] = useState(false);
+  const [gridStepM, setGridStepM] = useState(2);
+  const [widthStr, setWidthStr] = useState("40");
 
   // Landscape pitch when the window is wider than tall (desktop, rotated
   // phone/tablet); portrait pitch otherwise.
@@ -77,23 +91,33 @@ export default function BoardEditorPage() {
   const [fullscreen, setFullscreen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
-  // what's tapped in Move mode — shows a selection ring and a delete button
-  const [selected, setSelected] = useState<
-    { kind: "token" | "movement"; id: string } | null
-  >(null);
+  // current selection: one or many tokens, an arrow, or a distance marker
+  const [selected, setSelected] = useState<Selection | null>(null);
 
   const svgRef = useRef<SVGSVGElement | null>(null);
-  const dragTokenId = useRef<string | null>(null);
+  // drag of one or more selected tokens as a group
+  const drag = useRef<{
+    ids: string[];
+    start: Pt;
+    origins: Map<string, Pt>;
+  } | null>(null);
   const dragUndoTaken = useRef(false);
   // sampled finger path while drawing an arrow — empty means not drawing
-  const drawPoints = useRef<{ x: number; y: number }[]>([]);
+  const drawPoints = useRef<Pt[]>([]);
   const [preview, setPreview] = useState<BoardMovement | null>(null);
+  // measure-tool drag in progress
+  const measureStart = useRef<Pt | null>(null);
+  const [measurePreview, setMeasurePreview] = useState<{
+    a: Pt;
+    b: Pt;
+  } | null>(null);
+  // marquee rectangle drag in Move mode
+  const marqueeStart = useRef<Pt | null>(null);
+  const [marquee, setMarquee] = useState<{ a: Pt; b: Pt } | null>(null);
 
   // mouse hover position on the pitch — drives the ghost preview in place
   // mode (never set for touch, so phones are unaffected)
-  const [hoverPos, setHoverPos] = useState<{ x: number; y: number } | null>(
-    null
-  );
+  const [hoverPos, setHoverPos] = useState<Pt | null>(null);
 
   useEffect(() => {
     setHoverPos(null);
@@ -101,10 +125,9 @@ export default function BoardEditorPage() {
 
   // play-animation state: token id → animated position
   const [playing, setPlaying] = useState(false);
-  const [animPositions, setAnimPositions] = useState<Map<
-    string,
-    { x: number; y: number }
-  > | null>(null);
+  const [animPositions, setAnimPositions] = useState<Map<string, Pt> | null>(
+    null
+  );
   const playCancel = useRef<(() => void) | null>(null);
 
   useEffect(() => () => playCancel.current?.(), []);
@@ -176,7 +199,9 @@ export default function BoardEditorPage() {
   }
 
   useEffect(() => {
-    setBoard(storage.getBoards().find((b) => b.id === boardId) ?? null);
+    const b = storage.getBoards().find((x) => x.id === boardId) ?? null;
+    setBoard(b);
+    if (b) setWidthStr(String(b.widthM ?? 40));
     setLoaded(true);
   }, [boardId]);
 
@@ -232,11 +257,16 @@ export default function BoardEditorPage() {
           ...m,
           points: m.points.map((p) => ({ ...p })),
         })),
+        measures: (board.measures ?? []).map((m) => ({
+          ...m,
+          a: { ...m.a },
+          b: { ...m.b },
+        })),
       },
     ]);
   }
 
-  /** Apply a change to tokens/movements, recording undo history. */
+  /** Apply a change, recording undo history. */
   function commit(change: (b: Board) => Partial<Snapshot>) {
     if (!board) return;
     pushUndo();
@@ -245,23 +275,28 @@ export default function BoardEditorPage() {
 
   function deleteSelected() {
     if (!board || !selected) return;
-    if (selected.kind === "token") {
-      commit((b) => ({ tokens: b.tokens.filter((t) => t.id !== selected.id) }));
-    } else {
+    if (selected.kind === "tokens") {
+      const ids = new Set(selected.ids);
+      commit((b) => ({ tokens: b.tokens.filter((t) => !ids.has(t.id)) }));
+    } else if (selected.kind === "movement") {
       commit((b) => ({
         movements: b.movements.filter((m) => m.id !== selected.id),
+      }));
+    } else {
+      commit((b) => ({
+        measures: (b.measures ?? []).filter((m) => m.id !== selected.id),
       }));
     }
     setSelected(null);
   }
 
   function recolorSelectedCone(fill: string) {
-    if (!selected || selected.kind !== "token") return;
+    if (!selected || selected.kind !== "tokens" || selected.ids.length !== 1)
+      return;
+    const id = selected.ids[0];
     setConeColor(fill);
     commit((b) => ({
-      tokens: b.tokens.map((t) =>
-        t.id === selected.id ? { ...t, color: fill } : t
-      ),
+      tokens: b.tokens.map((t) => (t.id === id ? { ...t, color: fill } : t)),
     }));
   }
 
@@ -269,11 +304,45 @@ export default function BoardEditorPage() {
     if (!board || undoStack.length === 0) return;
     const last = undoStack[undoStack.length - 1];
     setUndoStack((prev) => prev.slice(0, -1));
-    persist({ ...board, tokens: last.tokens, movements: last.movements });
+    persist({
+      ...board,
+      tokens: last.tokens,
+      movements: last.movements,
+      measures: last.measures,
+    });
+    setSelected(null);
   }
 
+  // keyboard shortcuts: Delete removes the selection, Ctrl/Cmd+Z undoes,
+  // Escape deselects — ignored while typing in a field
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (
+        t &&
+        (t.tagName === "INPUT" ||
+          t.tagName === "TEXTAREA" ||
+          t.tagName === "SELECT" ||
+          t.isContentEditable)
+      )
+        return;
+      if (e.key === "Delete" || e.key === "Backspace") {
+        e.preventDefault();
+        deleteSelected();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        undo();
+      } else if (e.key === "Escape") {
+        setSelected(null);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // handlers close over current board/selection/undo state
+  });
+
   /** Screen position → pitch coordinates, in either orientation. */
-  function toPitch(e: React.PointerEvent): { x: number; y: number } {
+  function toPitch(e: React.PointerEvent): Pt {
     const rect = svgRef.current!.getBoundingClientRect();
     if (landscape) {
       // landscape view is the portrait pitch rotated 90° anticlockwise
@@ -298,12 +367,20 @@ export default function BoardEditorPage() {
     return used.length === 0 ? 1 : Math.max(...used) + 1;
   }
 
+  const widthM = board?.widthM ?? 40;
+  // grid step in pitch units, from the chosen step in metres
+  const stepU = (gridStepM / widthM) * PITCH_W;
+  const snapStep = snap ? stepU : false;
+
   function onCanvasPointerDown(e: React.PointerEvent) {
     if (!board || playing) return;
     const p = toPitch(e);
     if (mode.kind === "move") {
-      // tap on empty pitch clears the selection
-      setSelected(null);
+      // drag on empty pitch draws a marquee to select several at once;
+      // a plain tap (tiny marquee) just clears the selection
+      marqueeStart.current = p;
+      setMarquee({ a: p, b: p });
+      svgRef.current?.setPointerCapture(e.pointerId);
     } else if (mode.kind === "place") {
       // placing on empty pitch clears any current selection
       setSelected(null);
@@ -320,8 +397,8 @@ export default function BoardEditorPage() {
           {
             id: newId(),
             type: mode.token,
-            x: snapToGrid(p.x, snap),
-            y: snapToGrid(p.y, snap),
+            x: snapToGrid(p.x, snapStep),
+            y: snapToGrid(p.y, snapStep),
             label,
             color,
           },
@@ -330,6 +407,13 @@ export default function BoardEditorPage() {
     } else if (mode.kind === "draw") {
       drawPoints.current = [p];
       svgRef.current?.setPointerCapture(e.pointerId);
+    } else if (mode.kind === "measure") {
+      setSelected(null);
+      measureStart.current = {
+        x: snapToGrid(p.x, snapStep),
+        y: snapToGrid(p.y, snapStep),
+      };
+      svgRef.current?.setPointerCapture(e.pointerId);
     }
   }
 
@@ -337,27 +421,37 @@ export default function BoardEditorPage() {
     if (!board || playing) return;
     const p = toPitch(e);
     // ghost preview follows the mouse in place mode
-    if (
-      e.pointerType === "mouse" &&
-      mode.kind === "place" &&
-      !dragTokenId.current
-    ) {
+    if (e.pointerType === "mouse" && mode.kind === "place" && !drag.current) {
       setHoverPos(p);
     }
-    if (dragTokenId.current) {
+    if (drag.current) {
       // snapshot once, on the first actual move, so a plain tap-to-select
       // doesn't add an empty undo step
       if (!dragUndoTaken.current) {
         pushUndo();
         dragUndoTaken.current = true;
       }
+      const { ids, start, origins } = drag.current;
+      const dx = p.x - start.x;
+      const dy = p.y - start.y;
       persist({
         ...board,
-        tokens: board.tokens.map((t) =>
-          t.id === dragTokenId.current
-            ? { ...t, x: snapToGrid(p.x, snap), y: snapToGrid(p.y, snap) }
-            : t
-        ),
+        tokens: board.tokens.map((t) => {
+          if (!ids.includes(t.id)) return t;
+          const o = origins.get(t.id)!;
+          return {
+            ...t,
+            x: snapToGrid(o.x + dx, snapStep),
+            y: snapToGrid(o.y + dy, snapStep),
+          };
+        }),
+      });
+    } else if (marqueeStart.current && mode.kind === "move") {
+      setMarquee({ a: marqueeStart.current, b: p });
+    } else if (measureStart.current && mode.kind === "measure") {
+      setMeasurePreview({
+        a: measureStart.current,
+        b: { x: snapToGrid(p.x, snapStep), y: snapToGrid(p.y, snapStep) },
       });
     } else if (drawPoints.current.length > 0 && mode.kind === "draw") {
       const pts = drawPoints.current;
@@ -373,8 +467,43 @@ export default function BoardEditorPage() {
   }
 
   function onCanvasPointerUp(e: React.PointerEvent) {
-    if (dragTokenId.current) {
-      dragTokenId.current = null;
+    if (drag.current) {
+      drag.current = null;
+      return;
+    }
+    if (marqueeStart.current && mode.kind === "move" && board) {
+      const a = marqueeStart.current;
+      const b = toPitch(e);
+      marqueeStart.current = null;
+      setMarquee(null);
+      const minX = Math.min(a.x, b.x);
+      const maxX = Math.max(a.x, b.x);
+      const minY = Math.min(a.y, b.y);
+      const maxY = Math.max(a.y, b.y);
+      if (maxX - minX < 3 && maxY - minY < 3) {
+        // just a tap on empty pitch
+        setSelected(null);
+        return;
+      }
+      const ids = board.tokens
+        .filter(
+          (t) => t.x >= minX && t.x <= maxX && t.y >= minY && t.y <= maxY
+        )
+        .map((t) => t.id);
+      setSelected(ids.length > 0 ? { kind: "tokens", ids } : null);
+      return;
+    }
+    if (measureStart.current && mode.kind === "measure" && board) {
+      const a = measureStart.current;
+      const p = toPitch(e);
+      const b = { x: snapToGrid(p.x, snapStep), y: snapToGrid(p.y, snapStep) };
+      measureStart.current = null;
+      setMeasurePreview(null);
+      if (Math.hypot(b.x - a.x, b.y - a.y) >= 2) {
+        commit((bd) => ({
+          measures: [...(bd.measures ?? []), { id: newId(), a, b }],
+        }));
+      }
       return;
     }
     if (drawPoints.current.length > 0 && mode.kind === "draw" && board) {
@@ -401,16 +530,30 @@ export default function BoardEditorPage() {
   }
 
   function onTokenPointerDown(e: React.PointerEvent, token: BoardToken) {
-    if (playing) return;
+    if (playing || !board) return;
     // Tapping an existing icon always selects it (so you can move or delete
     // it) — in Move mode and in any Place tool. Only Draw lets the tap fall
     // through, so you can still draw an arrow starting from a player.
     if (mode.kind === "move" || mode.kind === "place") {
       e.stopPropagation();
-      // select it (so the delete bar shows) and arm a drag; the undo
-      // snapshot is deferred until the token actually moves
-      setSelected({ kind: "token", id: token.id });
-      dragTokenId.current = token.id;
+      // if it's part of the current multi-selection, drag the whole group
+      const ids =
+        selected?.kind === "tokens" &&
+        selected.ids.length > 1 &&
+        selected.ids.includes(token.id)
+          ? selected.ids
+          : [token.id];
+      setSelected({ kind: "tokens", ids });
+      const p = toPitch(e);
+      drag.current = {
+        ids,
+        start: p,
+        origins: new Map(
+          board.tokens
+            .filter((t) => ids.includes(t.id))
+            .map((t) => [t.id, { x: t.x, y: t.y }])
+        ),
+      };
       dragUndoTaken.current = false;
       svgRef.current?.setPointerCapture(e.pointerId);
     } else if (mode.kind === "erase") {
@@ -432,10 +575,24 @@ export default function BoardEditorPage() {
     }
   }
 
+  function onMeasurePointerDown(e: React.PointerEvent, measure: BoardMeasure) {
+    if (playing) return;
+    if (mode.kind === "move" || mode.kind === "place") {
+      e.stopPropagation();
+      setSelected({ kind: "measure", id: measure.id });
+    } else if (mode.kind === "erase") {
+      e.stopPropagation();
+      commit((b) => ({
+        measures: (b.measures ?? []).filter((m) => m.id !== measure.id),
+      }));
+    }
+  }
+
   function clearBoard() {
     if (!board) return;
     if (!window.confirm("Clear everything off this board?")) return;
-    commit(() => ({ tokens: [], movements: [] }));
+    commit(() => ({ tokens: [], movements: [], measures: [] }));
+    setSelected(null);
   }
 
   if (!loaded) return null;
@@ -504,6 +661,19 @@ export default function BoardEditorPage() {
         </button>
       ))}
       <button
+        onClick={() => setMode({ kind: "measure" })}
+        className={toolChip(mode.kind === "measure")}
+      >
+        <svg viewBox="0 0 24 12" className="h-5 w-6">
+          <line x1={3} y1={6} x2={21} y2={6} stroke="currentColor" strokeWidth={1.6} />
+          <line x1={3} y1={2.5} x2={3} y2={9.5} stroke="currentColor" strokeWidth={1.6} />
+          <line x1={21} y1={2.5} x2={21} y2={9.5} stroke="currentColor" strokeWidth={1.6} />
+          <line x1={9} y1={4.5} x2={9} y2={7.5} stroke="currentColor" strokeWidth={1.2} />
+          <line x1={15} y1={4.5} x2={15} y2={7.5} stroke="currentColor" strokeWidth={1.2} />
+        </svg>
+        Distance
+      </button>
+      <button
         onClick={() => setMode({ kind: "erase" })}
         className={toolChip(mode.kind === "erase")}
       >
@@ -512,6 +682,45 @@ export default function BoardEditorPage() {
       </button>
     </>
   );
+
+  const boardSettings =
+    snap || mode.kind === "measure" ? (
+      <div className="flex flex-wrap items-center gap-1.5 text-xs">
+        {snap && (
+          <>
+            <span className="font-medium text-stone-500">Grid:</span>
+            {GRID_STEPS_M.map((m) => (
+              <button
+                key={m}
+                onClick={() => setGridStepM(m)}
+                aria-pressed={gridStepM === m}
+                className={`min-h-[36px] rounded-full border px-2.5 font-semibold ${
+                  gridStepM === m
+                    ? "border-pitch bg-pitch text-white"
+                    : "border-stone-300 bg-white text-stone-600"
+                }`}
+              >
+                {m} m
+              </button>
+            ))}
+          </>
+        )}
+        <span className="pl-1 font-medium text-stone-500">Board width:</span>
+        <input
+          inputMode="numeric"
+          value={widthStr}
+          onChange={(e) => {
+            const s = e.target.value.replace(/\D/g, "").slice(0, 3);
+            setWidthStr(s);
+            const n = parseInt(s, 10);
+            if (n >= 5 && n <= 200) persist({ ...board, widthM: n });
+          }}
+          aria-label="Board width in metres"
+          className="min-h-[36px] w-14 rounded-lg border border-stone-300 px-2 text-center text-sm outline-none focus:border-pitch"
+        />
+        <span className="text-stone-500">m across</span>
+      </div>
+    ) : null;
 
   const subOptions =
     mode.kind === "place" && mode.token === "cone" ? (
@@ -563,9 +772,14 @@ export default function BoardEditorPage() {
 
   const hint = (
     <p className="text-center text-xs text-stone-400">
-      {mode.kind === "move" && "Tap any icon to select it, then drag to move or hit Delete."}
-      {mode.kind === "place" && `Tap the pitch to place a ${TOKEN_LABELS[mode.token].toLowerCase()} — or tap an existing icon to move it.`}
-      {mode.kind === "draw" && `Drag on the pitch to draw a ${MOVEMENT_STYLE[mode.movement].label.toLowerCase()} arrow — curve it as you go.`}
+      {mode.kind === "move" &&
+        "Tap to select, drag to move — or drag over empty pitch to select several."}
+      {mode.kind === "place" &&
+        `Tap the pitch to place a ${TOKEN_LABELS[mode.token].toLowerCase()} — or tap an existing icon to move it.`}
+      {mode.kind === "draw" &&
+        `Drag on the pitch to draw a ${MOVEMENT_STYLE[mode.movement].label.toLowerCase()} arrow — curve it as you go.`}
+      {mode.kind === "measure" &&
+        "Drag between two points to mark the distance in metres."}
       {mode.kind === "erase" && "Tap anything to rub it out."}
     </p>
   );
@@ -576,7 +790,9 @@ export default function BoardEditorPage() {
       const m = board.movements.find((x) => x.id === selected.id);
       return m ? `${MOVEMENT_STYLE[m.type].label} arrow` : "Arrow";
     }
-    const t = board.tokens.find((x) => x.id === selected.id);
+    if (selected.kind === "measure") return "Distance marker";
+    if (selected.ids.length > 1) return `${selected.ids.length} items`;
+    const t = board.tokens.find((x) => x.id === selected.ids[0]);
     if (!t) return "";
     return t.type === "player"
       ? `Player ${t.label ?? ""}`.trim()
@@ -584,15 +800,16 @@ export default function BoardEditorPage() {
   })();
 
   const selectedToken =
-    selected?.kind === "token"
-      ? board.tokens.find((t) => t.id === selected.id)
+    selected?.kind === "tokens" && selected.ids.length === 1
+      ? board.tokens.find((t) => t.id === selected.ids[0])
       : undefined;
 
   const selectionBar = selected ? (
     <div className="flex flex-col gap-2 rounded-lg border border-pitch bg-emerald-50 px-3 py-2">
       <div className="flex items-center justify-between gap-2">
         <span className="min-w-0 truncate text-sm font-semibold text-pitch">
-          {selectedLabel} selected — drag to move
+          {selectedLabel} selected
+          {selected.kind === "tokens" ? " — drag to move" : ""}
         </span>
         <div className="flex shrink-0 gap-2">
           <button
@@ -675,24 +892,32 @@ export default function BoardEditorPage() {
     </g>
   );
 
+  const selectionRing = (pos: Pt) => (
+    <circle
+      cx={pos.x}
+      cy={pos.y}
+      r={5.4}
+      fill="none"
+      stroke="#1e5b3c"
+      strokeWidth={0.7}
+      strokeDasharray="1.6 1"
+      pointerEvents="none"
+    />
+  );
+
   let selectionOverlay: React.ReactNode = null;
-  if (selected?.kind === "token") {
-    const t = board.tokens.find((x) => x.id === selected.id);
-    if (t) {
-      const pos = animPositions?.get(t.id) ?? t;
+  if (selected?.kind === "tokens") {
+    const sel = board.tokens.filter((t) => selected.ids.includes(t.id));
+    if (sel.length > 0) {
+      const first = sel[0];
+      const firstPos = animPositions?.get(first.id) ?? first;
       selectionOverlay = (
         <g>
-          <circle
-            cx={pos.x}
-            cy={pos.y}
-            r={5.4}
-            fill="none"
-            stroke="#1e5b3c"
-            strokeWidth={0.7}
-            strokeDasharray="1.6 1"
-            pointerEvents="none"
-          />
-          {deleteButton(pos.x + 5.5, pos.y - 5.5)}
+          {sel.map((t) => {
+            const pos = animPositions?.get(t.id) ?? t;
+            return <g key={t.id}>{selectionRing(pos)}</g>;
+          })}
+          {sel.length === 1 && deleteButton(firstPos.x + 5.5, firstPos.y - 5.5)}
         </g>
       );
     }
@@ -707,6 +932,22 @@ export default function BoardEditorPage() {
         </g>
       );
     }
+  } else if (selected?.kind === "measure") {
+    const ms = (board.measures ?? []).find((x) => x.id === selected.id);
+    if (ms) {
+      const mid = { x: (ms.a.x + ms.b.x) / 2, y: (ms.a.y + ms.b.y) / 2 };
+      selectionOverlay = (
+        <g>
+          <MeasureGlyph
+            measure={ms}
+            widthM={widthM}
+            screenDelta={landscape ? -90 : 0}
+            preview
+          />
+          {deleteButton(mid.x, mid.y + 5)}
+        </g>
+      );
+    }
   }
 
   // ghost preview of the tool being placed, following the mouse — hidden
@@ -717,8 +958,8 @@ export default function BoardEditorPage() {
       (t) => Math.hypot(t.x - hoverPos.x, t.y - hoverPos.y) <= 6
     );
     if (!overExisting) {
-      const gx = snapToGrid(hoverPos.x, snap);
-      const gy = snapToGrid(hoverPos.y, snap);
+      const gx = snapToGrid(hoverPos.x, snapStep);
+      const gy = snapToGrid(hoverPos.y, snapStep);
       const label =
         mode.token === "player"
           ? String(playerNum ?? nextAutoNumber(board.tokens))
@@ -751,9 +992,29 @@ export default function BoardEditorPage() {
         ? "grab"
         : undefined;
 
+  const marqueeRect =
+    marquee &&
+    (Math.abs(marquee.b.x - marquee.a.x) >= 3 ||
+      Math.abs(marquee.b.y - marquee.a.y) >= 3) ? (
+      <rect
+        x={Math.min(marquee.a.x, marquee.b.x)}
+        y={Math.min(marquee.a.y, marquee.b.y)}
+        width={Math.abs(marquee.b.x - marquee.a.x)}
+        height={Math.abs(marquee.b.y - marquee.a.y)}
+        fill="#ffffff"
+        fillOpacity={0.12}
+        stroke="#ffffff"
+        strokeWidth={0.5}
+        strokeDasharray="2 1.5"
+        pointerEvents="none"
+      />
+    ) : null;
+
+  const screenDelta = landscape ? -90 : 0;
+
   const boardContent = (
     <>
-      <Pitch variant={surfaceFor(board)} grid={snap} />
+      <Pitch variant={surfaceFor(board)} grid={snap ? stepU : 0} />
       {board.movements.map((m) => (
         <MovementGlyph
           key={m.id}
@@ -761,7 +1022,24 @@ export default function BoardEditorPage() {
           onPointerDown={(e) => onMovementPointerDown(e, m)}
         />
       ))}
+      {(board.measures ?? []).map((ms) => (
+        <MeasureGlyph
+          key={ms.id}
+          measure={ms}
+          widthM={widthM}
+          screenDelta={screenDelta}
+          onPointerDown={(e) => onMeasurePointerDown(e, ms)}
+        />
+      ))}
       {preview && <MovementGlyph movement={preview} preview />}
+      {measurePreview && (
+        <MeasureGlyph
+          measure={measurePreview}
+          widthM={widthM}
+          screenDelta={screenDelta}
+          preview
+        />
+      )}
       {board.tokens.map((t) => {
         const pos = animPositions?.get(t.id) ?? t;
         return (
@@ -789,12 +1067,13 @@ export default function BoardEditorPage() {
         );
       })}
       {ghost}
+      {marqueeRect}
       {!playing && selectionOverlay}
     </>
   );
 
   const canvasCursor =
-    mode.kind === "place" || mode.kind === "draw"
+    mode.kind === "place" || mode.kind === "draw" || mode.kind === "measure"
       ? "cursor-crosshair"
       : "";
 
@@ -890,6 +1169,7 @@ export default function BoardEditorPage() {
         <button
           onClick={undo}
           disabled={undoStack.length === 0}
+          title="Undo (Ctrl+Z)"
           className="min-h-[44px] shrink-0 rounded-lg border border-stone-300 bg-white px-3 text-sm font-semibold text-stone-600 disabled:opacity-40"
         >
           Undo
@@ -900,6 +1180,7 @@ export default function BoardEditorPage() {
         <div className="flex flex-1 items-start justify-center gap-4">
           <div className="flex w-[240px] shrink-0 flex-col gap-2">
             <div className="flex flex-wrap gap-1.5">{paletteButtons}</div>
+            {boardSettings}
             {subOptions}
             {selectionBar}
             {hint}
@@ -918,6 +1199,7 @@ export default function BoardEditorPage() {
           <div className="-mx-4 overflow-x-auto px-4">
             <div className="flex w-max gap-1.5">{paletteButtons}</div>
           </div>
+          {boardSettings}
           {subOptions}
           {selectionBar}
           {hint}

@@ -50,11 +50,9 @@ function coneStroke(fill: string): string {
 
 export type Surface = "pitch" | "plain";
 
-/** Snap grid step, in pitch units. */
-export const GRID = 5;
-
-export function snapToGrid(v: number, on: boolean): number {
-  return on ? Math.round(v / GRID) * GRID : v;
+/** Snap v to a grid of the given step (pitch units); falsy step = no snap. */
+export function snapToGrid(v: number, step: number | false): number {
+  return step ? Math.round(v / step) * step : v;
 }
 
 /** Drills use a plain training field; set plays and games use a full pitch. */
@@ -62,13 +60,13 @@ export function surfaceFor(board: { kind: BoardKind }): Surface {
   return board.kind === "drill" ? "plain" : "pitch";
 }
 
-function GridLines() {
+function GridLines({ step }: { step: number }) {
   const lines = [];
-  for (let x = GRID; x < PITCH_W; x += GRID)
+  for (let x = step; x < PITCH_W; x += step)
     lines.push(
       <line key={`v${x}`} x1={x} y1={0} x2={x} y2={PITCH_H} stroke="#fff" strokeWidth={0.25} opacity={0.18} />
     );
-  for (let y = GRID; y < PITCH_H; y += GRID)
+  for (let y = step; y < PITCH_H; y += step)
     lines.push(
       <line key={`h${y}`} x1={0} y1={y} x2={PITCH_W} y2={y} stroke="#fff" strokeWidth={0.25} opacity={0.18} />
     );
@@ -77,10 +75,11 @@ function GridLines() {
 
 export function Pitch({
   variant = "pitch",
-  grid = false,
+  grid = 0,
 }: {
   variant?: Surface;
-  grid?: boolean;
+  /** Grid line spacing in pitch units; 0/undefined hides the grid. */
+  grid?: number;
 }) {
   return (
     <g>
@@ -107,7 +106,7 @@ export function Pitch({
           <line x1={2} y1={PITCH_H - 42} x2={PITCH_W - 2} y2={PITCH_H - 42} stroke="#fff" strokeWidth={0.35} strokeDasharray="2 2" opacity={0.6} />
         </>
       )}
-      {grid && <GridLines />}
+      {grid > 0 && <GridLines step={grid} />}
     </g>
   );
 }
@@ -308,6 +307,90 @@ export function MovementGlyph({
   );
 }
 
+/**
+ * Dimension line labelled in metres. `screenDelta` is the rotation the
+ * containing view applies on screen (-90 in the landscape editor) so the
+ * label can stay upright-ish either way.
+ */
+export function MeasureGlyph({
+  measure,
+  widthM = 40,
+  screenDelta = 0,
+  preview = false,
+  onPointerDown,
+}: {
+  measure: { a: { x: number; y: number }; b: { x: number; y: number } };
+  widthM?: number;
+  screenDelta?: number;
+  preview?: boolean;
+  onPointerDown?: (e: React.PointerEvent) => void;
+}) {
+  const { a, b } = measure;
+  const len = Math.hypot(b.x - a.x, b.y - a.y);
+  if (len < 0.5) return null;
+  const meters = (len / PITCH_W) * widthM;
+  const value = meters >= 10 ? Math.round(meters) : Math.round(meters * 2) / 2;
+  const ang = (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI;
+  // keep the label the right way up after any on-screen rotation
+  let s = (((ang + screenDelta) % 360) + 360) % 360;
+  if (s > 90 && s < 270) s -= 180;
+  const labelRot = s - screenDelta;
+  const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+  const rad = (ang * Math.PI) / 180;
+  const px = Math.sin(rad);
+  const py = -Math.cos(rad);
+  const T = 1.9; // end-tick half length
+  const C = "#fbbf24";
+  return (
+    <g
+      opacity={preview ? 0.6 : 1}
+      className={onPointerDown ? "board-move" : undefined}
+    >
+      {onPointerDown && (
+        <line
+          x1={a.x}
+          y1={a.y}
+          x2={b.x}
+          y2={b.y}
+          stroke="transparent"
+          strokeWidth={7}
+          style={{ cursor: "pointer" }}
+          onPointerDown={onPointerDown}
+        />
+      )}
+      <line
+        x1={a.x}
+        y1={a.y}
+        x2={b.x}
+        y2={b.y}
+        stroke={C}
+        strokeWidth={0.6}
+        strokeDasharray="2 1.2"
+        pointerEvents="none"
+      />
+      <line x1={a.x - px * T} y1={a.y - py * T} x2={a.x + px * T} y2={a.y + py * T} stroke={C} strokeWidth={0.8} pointerEvents="none" />
+      <line x1={b.x - px * T} y1={b.y - py * T} x2={b.x + px * T} y2={b.y + py * T} stroke={C} strokeWidth={0.8} pointerEvents="none" />
+      <g
+        transform={`translate(${mid.x} ${mid.y}) rotate(${labelRot})`}
+        pointerEvents="none"
+      >
+        <text
+          textAnchor="middle"
+          dy={-1.5}
+          fontSize={3.4}
+          fontWeight={700}
+          fill={C}
+          stroke="#1c1917"
+          strokeWidth={0.45}
+          paintOrder="stroke"
+        >
+          {value} m
+        </text>
+      </g>
+    </g>
+  );
+}
+
 /** Non-interactive thumbnail for board lists. */
 export function BoardPreview({
   board,
@@ -326,6 +409,9 @@ export function BoardPreview({
       <Pitch variant={surfaceFor(board)} />
       {board.movements.map((m) => (
         <MovementGlyph key={m.id} movement={m} />
+      ))}
+      {(board.measures ?? []).map((ms) => (
+        <MeasureGlyph key={ms.id} measure={ms} widthM={board.widthM ?? 40} />
       ))}
       {board.tokens.map((t) => (
         <g key={t.id} transform={`translate(${t.x} ${t.y})`}>

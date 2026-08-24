@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Board } from "@/lib/types";
 import {
+  MeasureGlyph,
   MovementGlyph,
   PITCH_H,
   PITCH_W,
@@ -54,6 +55,9 @@ export default function AnimatedBoard({
         <Pitch variant={surfaceFor(board)} />
         {board.movements.map((m) => (
           <MovementGlyph key={m.id} movement={m} />
+        ))}
+        {(board.measures ?? []).map((ms) => (
+          <MeasureGlyph key={ms.id} measure={ms} widthM={board.widthM ?? 40} />
         ))}
         {board.tokens.map((t) => {
           const pos = anim?.get(t.id) ?? t;

@@ -66,6 +66,13 @@ Five bottom-nav tabs, components colocated by feature under `app/(tabs)/`:
    gets paired with it), ⤴ shares the board as a PNG, cones have a colour
    picker, players a number picker, and there's a Dad token for helpers.
    Landscape layout on wide screens plus a fullscreen button.
+   Boards carry a real-world width (`widthM`, default 40 m); the Distance
+   tool draws dimension lines labelled in metres, and grid lock snaps at a
+   selectable 1/2/5 m step derived from that width. In Move mode a drag
+   over empty pitch marquee-selects several tokens (drag any one to move
+   the group). Keyboard: Delete removes the selection, Ctrl/Cmd+Z undoes,
+   Escape deselects. Hovering with a mouse shows a ghost of the tool
+   being placed.
 5. **Match** — match list, squad + starting line-up setup, live match mode
    (two-column sub swapping, per-player try/tackle with undo toast, pause for
    halftime, needs-minutes highlight, fairness tip suggesting the next sub

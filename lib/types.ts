@@ -112,12 +112,24 @@ export interface BoardMovement {
   points: { x: number; y: number }[];
 }
 
+/** A distance marker: a dimension line between two points, labelled in
+ *  metres based on the board's real-world width. */
+export interface BoardMeasure {
+  id: string;
+  a: { x: number; y: number };
+  b: { x: number; y: number };
+}
+
 export interface Board {
   id: string;
   name: string;
   kind: BoardKind;
   tokens: BoardToken[];
   movements: BoardMovement[];
+  /** Distance markers (measure tool). */
+  measures?: BoardMeasure[];
+  /** Real-world width of the drawn area in metres (defaults to 40). */
+  widthM?: number;
   updatedMs: number;
 }
 
