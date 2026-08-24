@@ -13,6 +13,8 @@ export interface Player {
   id: string;
   name: string;
   notes: string;
+  /** Jersey number, optional. */
+  jersey?: number;
   /** Soft delete: archived players keep their history but leave the roster. */
   active: boolean;
 }

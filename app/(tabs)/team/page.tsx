@@ -23,13 +23,18 @@ export default function TeamPage() {
     storage.setPlayers(next);
   }
 
-  function addPlayer(name: string, notes: string) {
-    save([...players, { id: newId(), name, notes, active: true }]);
+  function addPlayer(name: string, notes: string, jersey?: number) {
+    save([...players, { id: newId(), name, notes, jersey, active: true }]);
     setAdding(false);
   }
 
-  function updatePlayer(id: string, name: string, notes: string) {
-    save(players.map((p) => (p.id === id ? { ...p, name, notes } : p)));
+  function updatePlayer(
+    id: string,
+    name: string,
+    notes: string,
+    jersey?: number
+  ) {
+    save(players.map((p) => (p.id === id ? { ...p, name, notes, jersey } : p)));
     setEditingId(null);
   }
 
@@ -119,8 +124,11 @@ export default function TeamPage() {
               <PlayerForm
                 initialName={player.name}
                 initialNotes={player.notes}
+                initialJersey={player.jersey}
                 submitLabel="Save"
-                onSubmit={(name, notes) => updatePlayer(player.id, name, notes)}
+                onSubmit={(name, notes, jersey) =>
+                  updatePlayer(player.id, name, notes, jersey)
+                }
                 onCancel={() => setEditingId(null)}
               />
             </li>
@@ -133,13 +141,20 @@ export default function TeamPage() {
                 }}
                 className="flex min-h-[56px] w-full items-center justify-between gap-3 rounded-xl border border-stone-200 bg-white px-4 py-3 text-left shadow-sm active:bg-stone-50"
               >
-                <span className="min-w-0">
-                  <span className="block font-semibold">{player.name}</span>
-                  {player.notes && (
-                    <span className="block truncate text-sm text-stone-500">
-                      {player.notes}
+                <span className="flex min-w-0 items-center gap-3">
+                  {player.jersey != null && (
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-pitch text-sm font-bold text-white">
+                      {player.jersey}
                     </span>
                   )}
+                  <span className="min-w-0">
+                    <span className="block font-semibold">{player.name}</span>
+                    {player.notes && (
+                      <span className="block truncate text-sm text-stone-500">
+                        {player.notes}
+                      </span>
+                    )}
+                  </span>
                 </span>
                 <span className="text-stone-400" aria-hidden>
                   ›

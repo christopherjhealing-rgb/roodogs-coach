@@ -5,38 +5,60 @@ import { useState } from "react";
 export default function PlayerForm({
   initialName = "",
   initialNotes = "",
+  initialJersey,
   submitLabel,
   onSubmit,
   onCancel,
 }: {
   initialName?: string;
   initialNotes?: string;
+  initialJersey?: number;
   submitLabel: string;
-  onSubmit: (name: string, notes: string) => void;
+  onSubmit: (name: string, notes: string, jersey?: number) => void;
   onCancel: () => void;
 }) {
   const [name, setName] = useState(initialName);
   const [notes, setNotes] = useState(initialNotes);
+  const [jersey, setJersey] = useState(
+    initialJersey != null ? String(initialJersey) : ""
+  );
   const trimmed = name.trim();
 
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        if (trimmed) onSubmit(trimmed, notes.trim());
+        if (!trimmed) return;
+        const n = parseInt(jersey, 10);
+        onSubmit(trimmed, notes.trim(), Number.isFinite(n) ? n : undefined);
       }}
       className="flex flex-col gap-3"
     >
-      <label className="flex flex-col gap-1 text-sm font-medium">
-        Name
-        <input
-          autoFocus
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="First name, e.g. Ruby"
-          className="min-h-[48px] rounded-lg border border-stone-300 px-3 text-base outline-none focus:border-pitch focus:ring-1 focus:ring-pitch"
-        />
-      </label>
+      <div className="flex gap-3">
+        <label className="flex flex-1 flex-col gap-1 text-sm font-medium">
+          Name
+          <input
+            autoFocus
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="First name, e.g. Ruby"
+            className="min-h-[48px] rounded-lg border border-stone-300 px-3 text-base outline-none focus:border-pitch focus:ring-1 focus:ring-pitch"
+          />
+        </label>
+        <label className="flex w-24 flex-col gap-1 text-sm font-medium">
+          Jersey <span className="font-normal text-stone-400">#</span>
+          <input
+            type="number"
+            inputMode="numeric"
+            min={0}
+            max={99}
+            value={jersey}
+            onChange={(e) => setJersey(e.target.value)}
+            placeholder="—"
+            className="min-h-[48px] rounded-lg border border-stone-300 px-3 text-base outline-none focus:border-pitch focus:ring-1 focus:ring-pitch"
+          />
+        </label>
+      </div>
       <label className="flex flex-col gap-1 text-sm font-medium">
         Notes <span className="font-normal text-stone-400">(optional)</span>
         <textarea
