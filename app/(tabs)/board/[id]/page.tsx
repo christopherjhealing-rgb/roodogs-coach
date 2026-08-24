@@ -21,6 +21,7 @@ import {
   Pitch,
   TOKEN_LABELS,
   TokenGlyph,
+  pointAlong,
 } from "../BoardCanvas";
 
 type Mode =
@@ -52,47 +53,6 @@ const PLAYER_NUMBERS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 interface Snapshot {
   tokens: BoardToken[];
   movements: BoardMovement[];
-}
-
-/** Position along a movement's path at progress t (0..1), matching how
- *  MovementGlyph draws it (arc for a two-point jump, polyline otherwise). */
-function pointAlong(m: BoardMovement, t: number): { x: number; y: number } {
-  const pts = m.points;
-  if (pts.length < 2) return pts[0] ?? { x: 0, y: 0 };
-  if (pts.length === 2 && m.type === "jump") {
-    const [s, e] = pts;
-    const mx = (s.x + e.x) / 2;
-    const my = (s.y + e.y) / 2;
-    const dx = e.x - s.x;
-    const dy = e.y - s.y;
-    const len = Math.hypot(dx, dy) || 1;
-    const cx = mx - (dy / len) * len * 0.3;
-    const cy = my + (dx / len) * len * 0.3;
-    const u = 1 - t;
-    return {
-      x: u * u * s.x + 2 * u * t * cx + t * t * e.x,
-      y: u * u * s.y + 2 * u * t * cy + t * t * e.y,
-    };
-  }
-  const segs: number[] = [];
-  let total = 0;
-  for (let i = 1; i < pts.length; i++) {
-    const d = Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
-    segs.push(d);
-    total += d;
-  }
-  let dist = t * total;
-  for (let i = 0; i < segs.length; i++) {
-    if (dist <= segs[i] || i === segs.length - 1) {
-      const f = segs[i] === 0 ? 1 : Math.min(1, dist / segs[i]);
-      return {
-        x: pts[i].x + (pts[i + 1].x - pts[i].x) * f,
-        y: pts[i].y + (pts[i + 1].y - pts[i].y) * f,
-      };
-    }
-    dist -= segs[i];
-  }
-  return pts[pts.length - 1];
 }
 
 export default function BoardEditorPage() {

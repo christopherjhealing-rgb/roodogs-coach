@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Board, Drill } from "@/lib/types";
-import { BoardPreview } from "../board/BoardCanvas";
+import AnimatedBoard from "../board/AnimatedBoard";
 import { TAG_BADGE_CLASSES, TAG_LABELS } from "../drills/tags";
 
 /** Fullscreen drill-by-drill walkthrough for running a session at training. */
@@ -63,9 +63,9 @@ export default function PresentMode({
           ))}
         </div>
         {board && (
-          <BoardPreview
+          <AnimatedBoard
             board={board}
-            className="mx-auto max-h-[45dvh] w-auto rounded-xl"
+            className="mx-auto w-full max-w-[280px]"
           />
         )}
         {drill.description && (

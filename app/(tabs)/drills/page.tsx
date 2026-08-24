@@ -6,6 +6,7 @@ import { ensureSeedData } from "@/lib/ensureSeed";
 import type { Board, Drill, DrillTag } from "@/lib/types";
 import { BoardPreview } from "../board/BoardCanvas";
 import DrillForm from "./DrillForm";
+import DrillViewer from "./DrillViewer";
 import { ALL_TAGS, TAG_BADGE_CLASSES, TAG_LABELS } from "./tags";
 
 export default function DrillsPage() {
@@ -15,6 +16,7 @@ export default function DrillsPage() {
   const [filter, setFilter] = useState<DrillTag | "all">("all");
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [viewing, setViewing] = useState<Drill | null>(null);
 
   // Read after mount (no localStorage on the server); seed the starter
   // library and its diagram boards the first time the tab is opened.
@@ -127,8 +129,11 @@ export default function DrillsPage() {
       )}
 
       <ul className="grid gap-2 sm:grid-cols-2">
-        {visible.map((drill) =>
-          editingId === drill.id ? (
+        {visible.map((drill) => {
+          const board = drill.boardId
+            ? boards.find((b) => b.id === drill.boardId)
+            : undefined;
+          return editingId === drill.id ? (
             <li
               key={drill.id}
               className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm"
@@ -144,13 +149,16 @@ export default function DrillsPage() {
               />
             </li>
           ) : (
-            <li key={drill.id}>
+            <li
+              key={drill.id}
+              className="overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm"
+            >
               <button
                 onClick={() => {
                   setEditingId(drill.id);
                   setAdding(false);
                 }}
-                className="flex w-full flex-col gap-1.5 rounded-xl border border-stone-200 bg-white px-4 py-3 text-left shadow-sm active:bg-stone-50"
+                className="flex w-full flex-col gap-1.5 px-4 py-3 text-left active:bg-stone-50"
               >
                 <span className="flex w-full items-baseline justify-between gap-3">
                   <span className="font-semibold">{drill.name}</span>
@@ -194,22 +202,38 @@ export default function DrillsPage() {
                     {drill.harder}
                   </span>
                 )}
-                {(() => {
-                  const board = drill.boardId
-                    ? boards.find((b) => b.id === drill.boardId)
-                    : undefined;
-                  return board ? (
-                    <BoardPreview
-                      board={board}
-                      className="mt-1 w-32 rounded-lg border border-stone-200"
-                    />
-                  ) : null;
-                })()}
               </button>
+              {board && (
+                <button
+                  onClick={() => setViewing(drill)}
+                  className="relative block w-full border-t border-stone-100 bg-stone-50 p-3 active:bg-stone-100"
+                  aria-label={`Watch ${drill.name}`}
+                >
+                  <BoardPreview
+                    board={board}
+                    className="mx-auto w-36 rounded-lg border border-stone-200"
+                  />
+                  <span className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-pitch px-3 py-1 text-xs font-bold text-white shadow">
+                    ▶ Watch
+                  </span>
+                </button>
+              )}
             </li>
-          )
-        )}
+          );
+        })}
       </ul>
+
+      {viewing && (
+        <DrillViewer
+          drill={viewing}
+          board={
+            viewing.boardId
+              ? boards.find((b) => b.id === viewing.boardId)
+              : undefined
+          }
+          onClose={() => setViewing(null)}
+        />
+      )}
     </div>
   );
 }
