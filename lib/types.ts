@@ -66,6 +66,7 @@ export type BoardKind = "drill" | "game" | "set_play";
 export type TokenType =
   | "player"
   | "opponent"
+  | "dad"
   | "cone"
   | "hurdle"
   | "bag"
@@ -81,6 +82,8 @@ export interface BoardToken {
   x: number;
   y: number;
   label?: string;
+  /** Fill colour override — currently used for cones. */
+  color?: string;
 }
 
 /** A movement arrow drawn on the whiteboard, start to finish. */

@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import BottomNav from "@/components/BottomNav";
+import AppShell from "@/components/AppShell";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -25,10 +25,7 @@ export default function RootLayout({
   return (
     <html lang="en-AU">
       <body className="min-h-dvh bg-stone-100 text-stone-900 antialiased">
-        <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col">
-          <main className="flex-1 pb-24">{children}</main>
-          <BottomNav />
-        </div>
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   );

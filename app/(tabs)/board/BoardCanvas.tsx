@@ -26,11 +26,26 @@ export const MOVEMENT_STYLE: Record<
 export const TOKEN_LABELS: Record<TokenType, string> = {
   player: "Player",
   opponent: "Defender",
+  dad: "Dad",
   cone: "Cone",
   hurdle: "Hurdle",
   bag: "Tackle bag",
   ball: "Ball",
 };
+
+/** Cone colour choices shown when the cone tool is selected. */
+export const CONE_COLORS: { fill: string; stroke: string; name: string }[] = [
+  { fill: "#fb923c", stroke: "#ea580c", name: "Orange" },
+  { fill: "#facc15", stroke: "#ca8a04", name: "Yellow" },
+  { fill: "#ef4444", stroke: "#b91c1c", name: "Red" },
+  { fill: "#3b82f6", stroke: "#1d4ed8", name: "Blue" },
+  { fill: "#22c55e", stroke: "#15803d", name: "Green" },
+  { fill: "#f5f5f4", stroke: "#a8a29e", name: "White" },
+];
+
+function coneStroke(fill: string): string {
+  return CONE_COLORS.find((c) => c.fill === fill)?.stroke ?? "#ea580c";
+}
 
 export function Pitch() {
   return (
@@ -84,15 +99,38 @@ export function TokenGlyph({ token }: { token: BoardToken }) {
           <line x1={-2.3} y1={2.3} x2={2.3} y2={-2.3} />
         </g>
       );
-    case "cone":
+    case "dad":
+      // parent helper — bigger than the kids, friendly hat silhouette
+      return (
+        <g>
+          <circle r={4.2} fill="#44403c" stroke="#1c1917" strokeWidth={0.6} />
+          <path
+            d="M -2.6 -1.4 A 2.6 2.6 0 0 1 2.6 -1.4 Z"
+            fill="#f5f5f4"
+          />
+          <rect x={-3.4} y={-1.5} width={6.8} height={0.9} rx={0.45} fill="#f5f5f4" />
+          <text
+            textAnchor="middle"
+            dy={3.2}
+            fontSize={2.6}
+            fontWeight={700}
+            fill="#f5f5f4"
+          >
+            D
+          </text>
+        </g>
+      );
+    case "cone": {
+      const fill = token.color ?? "#fb923c";
       return (
         <polygon
           points="0,-2.8 2.5,2.1 -2.5,2.1"
-          fill="#fb923c"
-          stroke="#ea580c"
+          fill={fill}
+          stroke={coneStroke(fill)}
           strokeWidth={0.4}
         />
       );
+    }
     case "hurdle":
       return (
         <rect
