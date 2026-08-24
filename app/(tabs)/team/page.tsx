@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 import { newId, storage } from "@/lib/storage";
 import type { Player } from "@/lib/types";
-import PlayerForm from "./PlayerForm";
+import PlayerForm, { type PlayerFormData } from "./PlayerForm";
+
+const UNIT_LABEL = { forwards: "Forwards", backs: "Backs" } as const;
 
 export default function TeamPage() {
   const [players, setPlayers] = useState<Player[]>([]);
@@ -23,18 +25,13 @@ export default function TeamPage() {
     storage.setPlayers(next);
   }
 
-  function addPlayer(name: string, notes: string, jersey?: number) {
-    save([...players, { id: newId(), name, notes, jersey, active: true }]);
+  function addPlayer(data: PlayerFormData) {
+    save([...players, { id: newId(), active: true, ...data }]);
     setAdding(false);
   }
 
-  function updatePlayer(
-    id: string,
-    name: string,
-    notes: string,
-    jersey?: number
-  ) {
-    save(players.map((p) => (p.id === id ? { ...p, name, notes, jersey } : p)));
+  function updatePlayer(id: string, data: PlayerFormData) {
+    save(players.map((p) => (p.id === id ? { ...p, ...data } : p)));
     setEditingId(null);
   }
 
@@ -122,13 +119,9 @@ export default function TeamPage() {
                 </button>
               </div>
               <PlayerForm
-                initialName={player.name}
-                initialNotes={player.notes}
-                initialJersey={player.jersey}
+                initial={player}
                 submitLabel="Save"
-                onSubmit={(name, notes, jersey) =>
-                  updatePlayer(player.id, name, notes, jersey)
-                }
+                onSubmit={(data) => updatePlayer(player.id, data)}
                 onCancel={() => setEditingId(null)}
               />
             </li>
@@ -149,8 +142,15 @@ export default function TeamPage() {
                   )}
                   <span className="min-w-0">
                     <span className="block font-semibold">{player.name}</span>
-                    {player.notes && (
+                    {(player.position || player.unit) && (
                       <span className="block truncate text-sm text-stone-500">
+                        {[player.position, player.unit && UNIT_LABEL[player.unit]]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </span>
+                    )}
+                    {player.notes && (
+                      <span className="block truncate text-xs text-stone-400">
                         {player.notes}
                       </span>
                     )}

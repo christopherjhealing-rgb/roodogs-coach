@@ -1,27 +1,34 @@
 "use client";
 
 import { useState } from "react";
+import type { Player, PlayerUnit } from "@/lib/types";
+
+export interface PlayerFormData {
+  name: string;
+  notes: string;
+  jersey?: number;
+  position?: string;
+  unit?: PlayerUnit;
+}
 
 export default function PlayerForm({
-  initialName = "",
-  initialNotes = "",
-  initialJersey,
+  initial,
   submitLabel,
   onSubmit,
   onCancel,
 }: {
-  initialName?: string;
-  initialNotes?: string;
-  initialJersey?: number;
+  initial?: Player;
   submitLabel: string;
-  onSubmit: (name: string, notes: string, jersey?: number) => void;
+  onSubmit: (data: PlayerFormData) => void;
   onCancel: () => void;
 }) {
-  const [name, setName] = useState(initialName);
-  const [notes, setNotes] = useState(initialNotes);
+  const [name, setName] = useState(initial?.name ?? "");
+  const [notes, setNotes] = useState(initial?.notes ?? "");
   const [jersey, setJersey] = useState(
-    initialJersey != null ? String(initialJersey) : ""
+    initial?.jersey != null ? String(initial.jersey) : ""
   );
+  const [position, setPosition] = useState(initial?.position ?? "");
+  const [unit, setUnit] = useState<PlayerUnit | "">(initial?.unit ?? "");
   const trimmed = name.trim();
 
   return (
@@ -30,7 +37,13 @@ export default function PlayerForm({
         e.preventDefault();
         if (!trimmed) return;
         const n = parseInt(jersey, 10);
-        onSubmit(trimmed, notes.trim(), Number.isFinite(n) ? n : undefined);
+        onSubmit({
+          name: trimmed,
+          notes: notes.trim(),
+          jersey: Number.isFinite(n) ? n : undefined,
+          position: position.trim() || undefined,
+          unit: unit || undefined,
+        });
       }}
       className="flex flex-col gap-3"
     >
@@ -59,16 +72,43 @@ export default function PlayerForm({
           />
         </label>
       </div>
+
+      <div className="flex gap-3">
+        <label className="flex flex-1 flex-col gap-1 text-sm font-medium">
+          Position{" "}
+          <span className="font-normal text-stone-400">(optional)</span>
+          <input
+            value={position}
+            onChange={(e) => setPosition(e.target.value)}
+            placeholder="e.g. Fly-half, Prop"
+            className="min-h-[48px] rounded-lg border border-stone-300 px-3 text-base outline-none focus:border-pitch focus:ring-1 focus:ring-pitch"
+          />
+        </label>
+        <label className="flex w-36 flex-col gap-1 text-sm font-medium">
+          Forwards / Backs
+          <select
+            value={unit}
+            onChange={(e) => setUnit(e.target.value as PlayerUnit | "")}
+            className="min-h-[48px] rounded-lg border border-stone-300 bg-white px-3 text-base outline-none focus:border-pitch focus:ring-1 focus:ring-pitch"
+          >
+            <option value="">—</option>
+            <option value="forwards">Forwards</option>
+            <option value="backs">Backs</option>
+          </select>
+        </label>
+      </div>
+
       <label className="flex flex-col gap-1 text-sm font-medium">
         Notes <span className="font-normal text-stone-400">(optional)</span>
         <textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          placeholder="Anything worth remembering — favourite position, big left boot…"
+          placeholder="Anything worth remembering — big left boot, loves a run…"
           rows={2}
           className="rounded-lg border border-stone-300 px-3 py-2 text-base outline-none focus:border-pitch focus:ring-1 focus:ring-pitch"
         />
       </label>
+
       <div className="flex gap-2">
         <button
           type="submit"

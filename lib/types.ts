@@ -9,12 +9,19 @@ export type DrillTag =
   | "fun"
   | "warmup";
 
+/** Rugby positional group. */
+export type PlayerUnit = "forwards" | "backs";
+
 export interface Player {
   id: string;
   name: string;
   notes: string;
   /** Jersey number, optional. */
   jersey?: number;
+  /** Free-text position, e.g. "Fly-half", "Prop". */
+  position?: string;
+  /** Forwards or backs. */
+  unit?: PlayerUnit;
   /** Soft delete: archived players keep their history but leave the roster. */
   active: boolean;
 }
