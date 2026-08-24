@@ -17,6 +17,11 @@ import {
 import { newId, storage } from "@/lib/storage";
 import type { Match, MatchEvent, Player } from "@/lib/types";
 
+/** Player name prefixed with their jersey number, when they have one. */
+function withNo(p: { name: string; jersey?: number }): string {
+  return p.jersey != null ? `#${p.jersey} ${p.name}` : p.name;
+}
+
 interface UndoToast {
   label: string;
   eventIds: string[];
@@ -263,7 +268,7 @@ export default function MatchDetailPage() {
                         : "border-stone-300 bg-white text-stone-600"
                     }`}
                   >
-                    {p.name}
+                    {withNo(p)}
                   </button>
                 );
               })}
@@ -379,7 +384,7 @@ export default function MatchDetailPage() {
                       }
                       className="flex min-h-[48px] w-full items-center justify-between gap-1 text-left"
                     >
-                      <span className="truncate font-semibold">{p.name}</span>
+                      <span className="truncate font-semibold">{withNo(p)}</span>
                       <span
                         className={`shrink-0 text-sm tabular-nums ${
                           behindThreshold >= 0 && t < behindThreshold
@@ -433,7 +438,7 @@ export default function MatchDetailPage() {
                   >
                     <span className="min-w-0">
                       <span className="block truncate font-semibold">
-                        {p.name}
+                        {withNo(p)}
                       </span>
                       {behind && (
                         <span className="text-xs font-medium text-amber-600">
@@ -489,7 +494,7 @@ export default function MatchDetailPage() {
                       }`}
                     >
                       {chosen ? "🏅 " : ""}
-                      {p.name}
+                      {withNo(p)}
                     </button>
                   );
                 })}
@@ -525,7 +530,7 @@ export default function MatchDetailPage() {
                 )
                 .map((p) => (
                   <tr key={p.id} className="border-b border-stone-100">
-                    <td className="py-2 font-medium">{p.name}</td>
+                    <td className="py-2 font-medium">{withNo(p)}</td>
                     <td className="py-2 text-right tabular-nums">
                       {formatClock(timeById.get(p.id) ?? 0)}
                     </td>
