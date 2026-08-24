@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { newId, storage } from "@/lib/storage";
+import { useDataVersion } from "@/components/SyncProvider";
 import type { Match, Player } from "@/lib/types";
 
 const STATUS_BADGE: Record<Match["status"], { label: string; cls: string }> = {
@@ -44,6 +45,7 @@ export default function MatchListPage() {
   const [date, setDate] = useState("");
   const [halfLength, setHalfLength] = useState("20");
   const [squadIds, setSquadIds] = useState<string[]>([]);
+  const dataVersion = useDataVersion();
 
   useEffect(() => {
     setMatches(storage.getMatches());
@@ -51,6 +53,14 @@ export default function MatchListPage() {
     setDate(nextSaturdayISO());
     setLoaded(true);
   }, []);
+
+  // Refresh the lists when a cloud sync pulls newer data from another device,
+  // without disturbing the new-match form's default date.
+  useEffect(() => {
+    if (dataVersion === 0) return;
+    setMatches(storage.getMatches());
+    setPlayers(storage.getPlayers().filter((p) => p.active));
+  }, [dataVersion]);
 
   function openCreate() {
     setSquadIds(players.map((p) => p.id));

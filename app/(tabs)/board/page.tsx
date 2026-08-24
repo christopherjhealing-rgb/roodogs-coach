@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { newId, storage } from "@/lib/storage";
+import { useDataVersion } from "@/components/SyncProvider";
 import type { Board, BoardKind } from "@/lib/types";
 import { BoardPreview } from "./BoardCanvas";
 
@@ -29,11 +30,12 @@ export default function BoardListPage() {
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
   const [kind, setKind] = useState<BoardKind>("drill");
+  const dataVersion = useDataVersion();
 
   useEffect(() => {
     setBoards(storage.getBoards());
     setLoaded(true);
-  }, []);
+  }, [dataVersion]);
 
   function save(next: Board[]) {
     setBoards(next);

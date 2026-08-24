@@ -9,6 +9,7 @@ import {
   playerGameTimeMs,
 } from "@/lib/gameTime";
 import { storage } from "@/lib/storage";
+import { useDataVersion } from "@/components/SyncProvider";
 
 interface PlayerSeason {
   id: string;
@@ -54,6 +55,7 @@ export default function StatsPage() {
   const [matchCount, setMatchCount] = useState(0);
   const [rolledSessions, setRolledSessions] = useState(0);
   const [loaded, setLoaded] = useState(false);
+  const dataVersion = useDataVersion();
 
   useEffect(() => {
     const players = storage.getPlayers();
@@ -120,7 +122,7 @@ export default function StatsPage() {
     setMatchCount(finished.length);
     setRolledSessions(rolled.length);
     setLoaded(true);
-  }, []);
+  }, [dataVersion]);
 
   const topTries = rows.reduce(
     (best, r) => (r.tries > (best?.tries ?? 0) ? r : best),

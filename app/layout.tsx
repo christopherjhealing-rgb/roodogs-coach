@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import AppShell from "@/components/AppShell";
 import PasswordGate from "@/components/PasswordGate";
+import SyncProvider from "@/components/SyncProvider";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -27,7 +28,9 @@ export default function RootLayout({
     <html lang="en-AU">
       <body className="min-h-dvh bg-stone-100 text-stone-900 antialiased">
         <PasswordGate>
-          <AppShell>{children}</AppShell>
+          <SyncProvider>
+            <AppShell>{children}</AppShell>
+          </SyncProvider>
         </PasswordGate>
       </body>
     </html>

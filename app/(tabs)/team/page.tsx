@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { newId, storage } from "@/lib/storage";
+import { useDataVersion } from "@/components/SyncProvider";
 import type { Player } from "@/lib/types";
 import FormationView from "./FormationView";
 import PlayerForm, { type PlayerFormData } from "./PlayerForm";
@@ -27,12 +28,14 @@ export default function TeamPage() {
   const [showArchived, setShowArchived] = useState(false);
   const [view, setView] = useState<"list" | "formation">("list");
   const [dragId, setDragId] = useState<string | null>(null);
+  const dataVersion = useDataVersion();
 
-  // localStorage isn't there during server render, so read after mount.
+  // localStorage isn't there during server render, so read after mount;
+  // re-read when a cloud sync pulls newer data from another device.
   useEffect(() => {
     setPlayers(storage.getPlayers());
     setLoaded(true);
-  }, []);
+  }, [dataVersion]);
 
   function save(next: Player[]) {
     setPlayers(next);

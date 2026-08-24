@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { newId, storage } from "@/lib/storage";
 import { ensureSeedData } from "@/lib/ensureSeed";
+import { useDataVersion } from "@/components/SyncProvider";
 import type { Board, Drill, Player, Session } from "@/lib/types";
 import PresentMode from "./PresentMode";
 import SessionBuilder from "./SessionBuilder";
@@ -27,17 +28,18 @@ export default function SessionsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [rollOpenId, setRollOpenId] = useState<string | null>(null);
   const [presentingId, setPresentingId] = useState<string | null>(null);
+  const dataVersion = useDataVersion();
 
   useEffect(() => {
     // Seed drills/boards here too, so the builder isn't empty if this tab
-    // is opened before the Drills tab ever has been.
+    // is opened before the Drills tab ever has been. Re-read on cloud sync.
     ensureSeedData();
     setDrills(storage.getDrills());
     setSessions(storage.getSessions());
     setPlayers(storage.getPlayers().filter((p) => p.active));
     setBoards(storage.getBoards());
     setLoaded(true);
-  }, []);
+  }, [dataVersion]);
 
   function save(next: Session[]) {
     setSessions(next);

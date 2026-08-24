@@ -10,51 +10,33 @@ function boardFor(drillId: string): string | undefined {
   return boardIds.has(id) ? id : undefined;
 }
 
-// Remember which seed ids have ever been added, so new seeds get merged in
-// on upgrade but ones the coach deleted don't keep coming back.
-function readSeeded(key: string): Set<string> {
-  if (typeof window === "undefined") return new Set();
-  try {
-    return new Set(JSON.parse(window.localStorage.getItem(key) ?? "[]"));
-  } catch {
-    return new Set();
-  }
-}
-function writeSeeded(key: string, ids: string[]): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(key, JSON.stringify(ids));
-  } catch {
-    // storage full/blocked — nothing to do
-  }
-}
-
-const DRILL_SEEDED_KEY = "roodogs.seededDrillIds";
-const BOARD_SEEDED_KEY = "roodogs.seededBoardIds";
-
 /**
  * Idempotently ensure the starter drills and diagram/set-play boards are in
  * storage, adding any that are new since last run (without resurrecting ones
  * the coach deleted) and linking each seed drill to its diagram.
+ *
+ * The "which seeds have ever been added" sets live in storage so cloud sync
+ * carries them between devices — otherwise a fresh device would re-add starter
+ * content the coach had already deleted elsewhere.
  */
 export function ensureSeedData(): void {
   // Boards first, so a drill's linked diagram always exists.
   const boards = storage.getBoards();
   const haveBoard = new Set(boards.map((b) => b.id));
-  const seededBoards = readSeeded(BOARD_SEEDED_KEY);
+  const seededBoards = new Set(storage.getSeededBoardIds());
   const newBoards = SEED_BOARDS.filter(
     (b) => !haveBoard.has(b.id) && !seededBoards.has(b.id)
   );
   if (newBoards.length) storage.setBoards([...boards, ...newBoards]);
-  writeSeeded(BOARD_SEEDED_KEY, SEED_BOARDS.map((b) => b.id));
+  storage.setSeededBoardIds(SEED_BOARDS.map((b) => b.id));
 
   const drills = storage.getDrills();
   const haveDrill = new Set(drills.map((d) => d.id));
-  const seededDrills = readSeeded(DRILL_SEEDED_KEY);
+  const seededDrills = new Set(storage.getSeededDrillIds());
   const newDrills = SEED_DRILLS.filter(
     (d) => !haveDrill.has(d.id) && !seededDrills.has(d.id)
   ).map((d) => ({ ...d, boardId: d.boardId ?? boardFor(d.id) }));
-  writeSeeded(DRILL_SEEDED_KEY, SEED_DRILLS.map((d) => d.id));
+  storage.setSeededDrillIds(SEED_DRILLS.map((d) => d.id));
 
   // Backfill boardId on existing seed drills that predate their diagrams.
   let next = [...drills, ...newDrills];

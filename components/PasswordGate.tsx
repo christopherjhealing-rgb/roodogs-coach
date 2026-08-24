@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { TEAM_PASSWORD } from "@/lib/appConfig";
 import { LogoMark } from "./NavIcon";
 
-// Soft shared-team gate. There's no server, so this only keeps casual
-// visitors out — the password necessarily ships in the app. Change it here.
-const PASSWORD = "wanneroo10";
+// Soft shared-team gate. This only keeps casual visitors out — the password
+// necessarily ships in the app. Change it in lib/appConfig.ts.
+const PASSWORD = TEAM_PASSWORD;
 const KEY = "roodogs.unlocked";
 
 export default function PasswordGate({

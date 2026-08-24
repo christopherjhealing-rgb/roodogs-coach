@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { newId, storage } from "@/lib/storage";
 import { ensureSeedData } from "@/lib/ensureSeed";
+import { useDataVersion } from "@/components/SyncProvider";
 import type { Board, Drill, DrillTag } from "@/lib/types";
 import { BoardPreview } from "../board/BoardCanvas";
 import DrillForm from "./DrillForm";
@@ -17,15 +18,17 @@ export default function DrillsPage() {
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [viewing, setViewing] = useState<Drill | null>(null);
+  const dataVersion = useDataVersion();
 
   // Read after mount (no localStorage on the server); seed the starter
   // library and its diagram boards the first time the tab is opened.
+  // Re-read when a cloud sync pulls newer data from another device.
   useEffect(() => {
     ensureSeedData();
     setDrills(storage.getDrills());
     setBoards(storage.getBoards());
     setLoaded(true);
-  }, []);
+  }, [dataVersion]);
 
   function save(next: Drill[]) {
     setDrills(next);

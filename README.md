@@ -15,9 +15,11 @@ run.
   tackle buttons with undo, pause for halftime
 - **Season stats** — minutes, games, tries and tackles per player
 
-Everything is stored locally on the phone (localStorage) — no accounts, no
-server, no player data leaving the device. Installable to the home screen as
-a PWA.
+Everything is stored on the device (localStorage) and installable to the home
+screen as a PWA. Turn on **cross-device sync** (a free Vercel store, ~10 min,
+no code) to share one dataset between your computer and phone — see
+[docs/SYNC-SETUP.md](docs/SYNC-SETUP.md). Without it, the app runs local-only
+on each device, exactly as before.
 
 ## Running it
 

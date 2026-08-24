@@ -16,10 +16,12 @@ at training and on the sideline on game day.
 
 - Next.js (App Router) + React, deployed on Vercel
 - TypeScript, Tailwind for styling
-- **No database, no auth for v1.** All state in localStorage via a single
-  storage module (`lib/storage.ts`). Components only ever talk to its typed
-  get/set interface so it can be swapped for Vercel KV or a DB later without
-  touching components.
+- **No auth.** Soft team password gate (`lib/appConfig.ts`), client-side only.
+- All state in localStorage via a single storage module (`lib/storage.ts`).
+  Components only ever talk to its typed get/set interface.
+- **Local-first cloud sync** (optional) layers on top so the coach's devices
+  share one dataset — see "Cross-device sync" below. With no cloud store
+  configured the app runs exactly as before, on that device only.
 - PWA: manifest + icons so it can be installed to the home screen
 
 ## U9 rugby context (rules that shape the app)
@@ -82,6 +84,36 @@ Five bottom-nav tabs, components colocated by feature under `app/(tabs)/`:
 Plus `/stats` (linked from the Match tab): season totals per player
 including trainings attended, positive-only milestone badges, and CSV
 export via the share sheet.
+
+## Cross-device sync
+
+The coach uses the app on a computer and a phone; both need the same data.
+Sync is **local-first**: every device still reads/writes localStorage
+instantly, and a background layer keeps a shared cloud copy in step.
+
+- **Store**: one JSON document `{ snapshot, rev }` in a Redis REST store,
+  behind `app/api/state/route.ts`. Vercel KV / Upstash Marketplace injects
+  `KV_REST_API_URL` + `KV_REST_API_TOKEN` (also accepts `UPSTASH_REDIS_REST_*`).
+  With **no store configured the endpoint reports `configured:false`** and the
+  app is local-only — nothing breaks. `SYNC_DEV_STORE=1` uses a process-memory
+  store for local testing only (never in production). `SYNC_PASSWORD`
+  optionally hardens the endpoint; unset = open (soft, matches the app gate).
+- **Snapshot** = the synced collections (players, drills, sessions, matches,
+  matchEvents, boards, formation, and the two seed-tracking sets), each tagged
+  with a "last changed" time. `storage.ts` stamps that time and fires a
+  `roodogs:write` event on every real change (no-op writes are skipped).
+- **Merge** (`lib/sync.ts`, unit-tested in `sync.test.ts`): per-collection
+  last-write-wins. The right grain for one coach on two devices — editing the
+  roster on the phone can't clobber a boards edit made earlier on the computer,
+  and deletions within a collection propagate. Pure and framework-free.
+- **Lifecycle** (`components/SyncProvider.tsx`, under the password gate):
+  pulls on boot (behind a brief "Syncing…" splash, time-boxed so a dead
+  network never hangs), pushes debounced on change with an optimistic `rev`
+  check (conflict → merge server state and retry), and re-pulls on tab focus.
+  A pulled change bumps `useDataVersion()`, which the list pages depend on so
+  they re-read live. Detail editors (board `[id]`, match `[id]`) deliberately
+  don't auto-refresh mid-edit. A small corner badge shows Saving/Saved/Offline/
+  This device only.
 
 ## Conventions
 
