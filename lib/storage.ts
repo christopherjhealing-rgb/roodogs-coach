@@ -11,6 +11,7 @@ const KEYS = {
   matches: "roodogs.matches",
   matchEvents: "roodogs.matchEvents",
   boards: "roodogs.boards",
+  formation: "roodogs.formation",
 } as const;
 
 function read<T>(key: string, fallback: T): T {
@@ -68,6 +69,14 @@ export const storage = {
   },
   setMatches(matches: Match[]): void {
     write(KEYS.matches, matches);
+  },
+
+  /** Team-shape slot assignments: slot id → player id. */
+  getFormation(): Record<string, string> {
+    return read<Record<string, string>>(KEYS.formation, {});
+  },
+  setFormation(map: Record<string, string>): void {
+    write(KEYS.formation, map);
   },
 
   getBoards(): Board[] {

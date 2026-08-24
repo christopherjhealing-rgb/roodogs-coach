@@ -99,6 +99,8 @@ export type TokenType =
   | "cone"
   | "hurdle"
   | "bag"
+  /** Flat hit/tackle pad (shield) — different bit of kit to the bag. */
+  | "pad"
   | "ball";
 
 export type MovementType = "run" | "pass" | "kick" | "tackle" | "jump";

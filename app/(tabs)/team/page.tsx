@@ -26,6 +26,7 @@ export default function TeamPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showArchived, setShowArchived] = useState(false);
   const [view, setView] = useState<"list" | "formation">("list");
+  const [dragId, setDragId] = useState<string | null>(null);
 
   // localStorage isn't there during server render, so read after mount.
   useEffect(() => {
@@ -58,18 +59,42 @@ export default function TeamPage() {
     .filter((p) => !p.active)
     .sort((a, b) => a.name.localeCompare(b.name));
 
-  /** Move a roster card up/down, materialising the manual order. */
-  function movePlayer(index: number, delta: -1 | 1) {
-    const target = index + delta;
-    if (target < 0 || target >= roster.length) return;
-    const ids = roster.map((p) => p.id);
-    [ids[index], ids[target]] = [ids[target], ids[index]];
+  /** Reorder by drag: put dragged player into the slot of the card under
+   *  the pointer, materialising the manual order for the whole roster. */
+  function moveTo(dragId: string, overId: string) {
+    if (dragId === overId) return;
+    const ids = roster.map((p) => p.id).filter((id) => id !== dragId);
+    const at = ids.indexOf(overId);
+    if (at < 0) return;
+    ids.splice(at, 0, dragId);
     const orderOf = new Map(ids.map((id, i) => [id, i]));
     save(
       players.map((p) =>
         orderOf.has(p.id) ? { ...p, order: orderOf.get(p.id) } : p
       )
     );
+  }
+
+  function resetOrder() {
+    save(players.map((p) => ({ ...p, order: undefined })));
+  }
+
+  const hasManualOrder = players.some((p) => p.order != null);
+
+  function onHandlePointerDown(e: React.PointerEvent, id: string) {
+    e.preventDefault();
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    setDragId(id);
+  }
+
+  function onHandlePointerMove(e: React.PointerEvent) {
+    if (!dragId) return;
+    const li = document
+      .elementsFromPoint(e.clientX, e.clientY)
+      .map((el) => (el as HTMLElement).closest?.("[data-pid]"))
+      .find(Boolean) as HTMLElement | undefined;
+    const overId = li?.dataset.pid;
+    if (overId && overId !== dragId) moveTo(dragId, overId);
   }
 
   return (
@@ -180,8 +205,23 @@ export default function TeamPage() {
           ) : (
             <li
               key={player.id}
-              className="flex items-stretch overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm"
+              data-pid={player.id}
+              className={`flex items-stretch overflow-hidden rounded-xl border bg-white shadow-sm transition-opacity ${
+                dragId === player.id
+                  ? "border-pitch opacity-60"
+                  : "border-stone-200"
+              }`}
             >
+              <button
+                onPointerDown={(e) => onHandlePointerDown(e, player.id)}
+                onPointerMove={onHandlePointerMove}
+                onPointerUp={() => setDragId(null)}
+                onPointerCancel={() => setDragId(null)}
+                aria-label={`Drag to reorder ${player.name}`}
+                className="flex w-9 shrink-0 cursor-grab touch-none items-center justify-center border-r border-stone-100 text-stone-300 hover:text-pitch active:cursor-grabbing"
+              >
+                ⠿
+              </button>
               <button
                 onClick={() => {
                   setEditingId(player.id);
@@ -212,28 +252,19 @@ export default function TeamPage() {
                   </span>
                 </span>
               </button>
-              <span className="flex shrink-0 flex-col border-l border-stone-100">
-                <button
-                  onClick={() => movePlayer(index, -1)}
-                  disabled={index === 0}
-                  aria-label={`Move ${player.name} up`}
-                  className="min-h-[28px] flex-1 px-2.5 text-sm text-stone-400 hover:text-pitch disabled:opacity-30"
-                >
-                  ▲
-                </button>
-                <button
-                  onClick={() => movePlayer(index, 1)}
-                  disabled={index === roster.length - 1}
-                  aria-label={`Move ${player.name} down`}
-                  className="min-h-[28px] flex-1 border-t border-stone-100 px-2.5 text-sm text-stone-400 hover:text-pitch disabled:opacity-30"
-                >
-                  ▼
-                </button>
-              </span>
             </li>
           )
         )}
       </ul>
+
+      {view === "list" && hasManualOrder && (
+        <button
+          onClick={resetOrder}
+          className="min-h-[44px] w-fit rounded-lg px-3 text-sm font-medium text-stone-500 underline underline-offset-2"
+        >
+          Reset to number order
+        </button>
+      )}
 
       {archived.length > 0 && (
         <section className="mt-2">

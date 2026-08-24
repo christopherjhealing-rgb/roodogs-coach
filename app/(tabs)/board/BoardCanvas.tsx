@@ -31,6 +31,7 @@ export const TOKEN_LABELS: Record<TokenType, string> = {
   cone: "Cone",
   hurdle: "Hurdle",
   bag: "Tackle bag",
+  pad: "Hit pad",
   ball: "Ball",
 };
 
@@ -206,6 +207,38 @@ export function TokenGlyph({ token }: { token: BoardToken }) {
           stroke="#1d4ed8"
           strokeWidth={0.4}
         />
+      );
+    case "pad":
+      // flat hit shield seen from above — red with a strap across
+      return (
+        <g>
+          <rect
+            x={-3}
+            y={-2.4}
+            width={6}
+            height={4.8}
+            rx={1}
+            fill="#dc2626"
+            stroke="#991b1b"
+            strokeWidth={0.4}
+          />
+          <line
+            x1={-1.6}
+            y1={-2.4}
+            x2={-1.6}
+            y2={2.4}
+            stroke="#fecaca"
+            strokeWidth={0.6}
+          />
+          <line
+            x1={1.6}
+            y1={-2.4}
+            x2={1.6}
+            y2={2.4}
+            stroke="#fecaca"
+            strokeWidth={0.6}
+          />
+        </g>
       );
     case "ball":
       return (

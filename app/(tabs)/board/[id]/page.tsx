@@ -37,10 +37,30 @@ type Mode =
   | { kind: "place"; token: TokenType }
   | { kind: "draw"; movement: MovementType };
 
-type Selection =
-  | { kind: "tokens"; ids: string[] }
-  | { kind: "movement"; id: string }
-  | { kind: "measure"; id: string };
+/** Unified selection — any mix of tokens, arrows and distance markers. */
+interface Selection {
+  tokens: string[];
+  movements: string[];
+  measures: string[];
+}
+
+const selTokens = (ids: string[]): Selection => ({
+  tokens: ids,
+  movements: [],
+  measures: [],
+});
+const selMovements = (ids: string[]): Selection => ({
+  tokens: [],
+  movements: ids,
+  measures: [],
+});
+const selMeasures = (ids: string[]): Selection => ({
+  tokens: [],
+  movements: [],
+  measures: ids,
+});
+const selCount = (s: Selection | null): number =>
+  s ? s.tokens.length + s.movements.length + s.measures.length : 0;
 
 const TOKEN_TYPES: TokenType[] = [
   "player",
@@ -49,6 +69,7 @@ const TOKEN_TYPES: TokenType[] = [
   "cone",
   "hurdle",
   "bag",
+  "pad",
   "ball",
 ];
 
@@ -121,11 +142,13 @@ export default function BoardEditorPage() {
   const [selected, setSelected] = useState<Selection | null>(null);
 
   const svgRef = useRef<SVGSVGElement | null>(null);
-  // drag of one or more selected tokens as a group
+  // drag of the current selection (tokens, arrows, measures) as a group
   const drag = useRef<{
-    ids: string[];
+    sel: Selection;
     start: Pt;
-    origins: Map<string, Pt>;
+    tokenOrigins: Map<string, Pt>;
+    movementOrigins: Map<string, Pt[]>;
+    measureOrigins: Map<string, { a: Pt; b: Pt }>;
   } | null>(null);
   const dragUndoTaken = useRef(false);
   // sampled finger path while drawing an arrow — empty means not drawing
@@ -301,28 +324,56 @@ export default function BoardEditorPage() {
 
   function deleteSelected() {
     if (!board || !selected) return;
-    if (selected.kind === "tokens") {
-      const ids = new Set(selected.ids);
-      commit((b) => ({ tokens: b.tokens.filter((t) => !ids.has(t.id)) }));
-    } else if (selected.kind === "movement") {
-      commit((b) => ({
-        movements: b.movements.filter((m) => m.id !== selected.id),
-      }));
-    } else {
-      commit((b) => ({
-        measures: (b.measures ?? []).filter((m) => m.id !== selected.id),
-      }));
-    }
+    const tk = new Set(selected.tokens);
+    const mv = new Set(selected.movements);
+    const ms = new Set(selected.measures);
+    commit((b) => ({
+      tokens: b.tokens.filter((t) => !tk.has(t.id)),
+      movements: b.movements.filter((m) => !mv.has(m.id)),
+      measures: (b.measures ?? []).filter((m) => !ms.has(m.id)),
+    }));
     setSelected(null);
   }
 
+  /** The single selected token, when exactly one item is selected. */
+  function soleToken(): BoardToken | undefined {
+    if (!board || !selected) return undefined;
+    if (selCount(selected) !== 1 || selected.tokens.length !== 1)
+      return undefined;
+    return board.tokens.find((t) => t.id === selected.tokens[0]);
+  }
+
+  function soleMovement(): BoardMovement | undefined {
+    if (!board || !selected) return undefined;
+    if (selCount(selected) !== 1 || selected.movements.length !== 1)
+      return undefined;
+    return board.movements.find((m) => m.id === selected.movements[0]);
+  }
+
   function recolorSelectedCone(fill: string) {
-    if (!selected || selected.kind !== "tokens" || selected.ids.length !== 1)
-      return;
-    const id = selected.ids[0];
+    const t = soleToken();
+    if (!t) return;
     setConeColor(fill);
     commit((b) => ({
-      tokens: b.tokens.map((t) => (t.id === id ? { ...t, color: fill } : t)),
+      tokens: b.tokens.map((x) => (x.id === t.id ? { ...x, color: fill } : x)),
+    }));
+  }
+
+  function renumberSelectedPlayer(n: number | undefined) {
+    const t = soleToken();
+    if (!t) return;
+    commit((b) => ({
+      tokens: b.tokens.map((x) =>
+        x.id === t.id ? { ...x, label: n != null ? String(n) : undefined } : x
+      ),
+    }));
+  }
+
+  function retypeSelectedMovement(type: MovementType) {
+    const m = soleMovement();
+    if (!m) return;
+    commit((b) => ({
+      movements: b.movements.map((x) => (x.id === m.id ? { ...x, type } : x)),
     }));
   }
 
@@ -462,18 +513,43 @@ export default function BoardEditorPage() {
         pushUndo();
         dragUndoTaken.current = true;
       }
-      const { ids, start, origins } = drag.current;
-      const dx = p.x - start.x;
-      const dy = p.y - start.y;
+      const d = drag.current;
+      const dx = p.x - d.start.x;
+      const dy = p.y - d.start.y;
+      const single =
+        selCount(d.sel) === 1 && d.sel.tokens.length === 1;
+      // a lone token snaps onto the grid; a group moves by a snapped delta
+      // so everything keeps its relative layout
+      const sdx = snapStep ? snapToGrid(dx, snapStep) : dx;
+      const sdy = snapStep ? snapToGrid(dy, snapStep) : dy;
       persist({
         ...board,
         tokens: board.tokens.map((t) => {
-          if (!ids.includes(t.id)) return t;
-          const o = origins.get(t.id)!;
+          const o = d.tokenOrigins.get(t.id);
+          if (!o) return t;
+          return single
+            ? {
+                ...t,
+                x: snapToGrid(o.x + dx, snapStep),
+                y: snapToGrid(o.y + dy, snapStep),
+              }
+            : { ...t, x: o.x + sdx, y: o.y + sdy };
+        }),
+        movements: board.movements.map((m) => {
+          const o = d.movementOrigins.get(m.id);
+          if (!o) return m;
           return {
-            ...t,
-            x: snapToGrid(o.x + dx, snapStep),
-            y: snapToGrid(o.y + dy, snapStep),
+            ...m,
+            points: o.map((pt) => ({ x: pt.x + sdx, y: pt.y + sdy })),
+          };
+        }),
+        measures: (board.measures ?? []).map((m) => {
+          const o = d.measureOrigins.get(m.id);
+          if (!o) return m;
+          return {
+            ...m,
+            a: { x: o.a.x + sdx, y: o.a.y + sdy },
+            b: { x: o.b.x + sdx, y: o.b.y + sdy },
           };
         }),
       });
@@ -525,12 +601,18 @@ export default function BoardEditorPage() {
         setSelected(null);
         return;
       }
-      const ids = board.tokens
-        .filter(
-          (t) => t.x >= minX && t.x <= maxX && t.y >= minY && t.y <= maxY
-        )
-        .map((t) => t.id);
-      setSelected(ids.length > 0 ? { kind: "tokens", ids } : null);
+      const inside = (pt: Pt) =>
+        pt.x >= minX && pt.x <= maxX && pt.y >= minY && pt.y <= maxY;
+      const sel: Selection = {
+        tokens: board.tokens.filter((t) => inside(t)).map((t) => t.id),
+        movements: board.movements
+          .filter((m) => m.points.length > 0 && m.points.every(inside))
+          .map((m) => m.id),
+        measures: (board.measures ?? [])
+          .filter((m) => inside(m.a) && inside(m.b))
+          .map((m) => m.id),
+      };
+      setSelected(selCount(sel) > 0 ? sel : null);
       return;
     }
     if (measureStart.current && mode.kind === "measure" && board) {
@@ -572,6 +654,48 @@ export default function BoardEditorPage() {
     }
   }
 
+  /** Select and arm a drag of `sel` starting at the event's position. */
+  function startDrag(e: React.PointerEvent, sel: Selection) {
+    if (!board) return;
+    setSelected(sel);
+    const tk = new Set(sel.tokens);
+    const mv = new Set(sel.movements);
+    const ms = new Set(sel.measures);
+    drag.current = {
+      sel,
+      start: toPitch(e),
+      tokenOrigins: new Map(
+        board.tokens
+          .filter((t) => tk.has(t.id))
+          .map((t) => [t.id, { x: t.x, y: t.y }])
+      ),
+      movementOrigins: new Map(
+        board.movements
+          .filter((m) => mv.has(m.id))
+          .map((m) => [m.id, m.points.map((p) => ({ ...p }))])
+      ),
+      measureOrigins: new Map(
+        (board.measures ?? [])
+          .filter((m) => ms.has(m.id))
+          .map((m) => [m.id, { a: { ...m.a }, b: { ...m.b } }])
+      ),
+    };
+    dragUndoTaken.current = false;
+    svgRef.current?.setPointerCapture(e.pointerId);
+  }
+
+  /** The existing selection if this item belongs to it (group drag), else
+   *  a fresh single-item selection. */
+  function selectionFor(
+    kind: keyof Selection,
+    id: string,
+    single: Selection
+  ): Selection {
+    return selected && selCount(selected) > 1 && selected[kind].includes(id)
+      ? selected
+      : single;
+  }
+
   function onTokenPointerDown(e: React.PointerEvent, token: BoardToken) {
     if (playing || !board) return;
     // Tapping an existing icon always selects it (so you can move or delete
@@ -579,26 +703,7 @@ export default function BoardEditorPage() {
     // through, so you can still draw an arrow starting from a player.
     if (mode.kind === "move" || mode.kind === "place") {
       e.stopPropagation();
-      // if it's part of the current multi-selection, drag the whole group
-      const ids =
-        selected?.kind === "tokens" &&
-        selected.ids.length > 1 &&
-        selected.ids.includes(token.id)
-          ? selected.ids
-          : [token.id];
-      setSelected({ kind: "tokens", ids });
-      const p = toPitch(e);
-      drag.current = {
-        ids,
-        start: p,
-        origins: new Map(
-          board.tokens
-            .filter((t) => ids.includes(t.id))
-            .map((t) => [t.id, { x: t.x, y: t.y }])
-        ),
-      };
-      dragUndoTaken.current = false;
-      svgRef.current?.setPointerCapture(e.pointerId);
+      startDrag(e, selectionFor("tokens", token.id, selTokens([token.id])));
     } else if (mode.kind === "erase") {
       e.stopPropagation();
       commit((b) => ({ tokens: b.tokens.filter((t) => t.id !== token.id) }));
@@ -609,7 +714,10 @@ export default function BoardEditorPage() {
     if (playing) return;
     if (mode.kind === "move" || mode.kind === "place") {
       e.stopPropagation();
-      setSelected({ kind: "movement", id: movement.id });
+      startDrag(
+        e,
+        selectionFor("movements", movement.id, selMovements([movement.id]))
+      );
     } else if (mode.kind === "erase") {
       e.stopPropagation();
       commit((b) => ({
@@ -622,7 +730,10 @@ export default function BoardEditorPage() {
     if (playing) return;
     if (mode.kind === "move" || mode.kind === "place") {
       e.stopPropagation();
-      setSelected({ kind: "measure", id: measure.id });
+      startDrag(
+        e,
+        selectionFor("measures", measure.id, selMeasures([measure.id]))
+      );
     } else if (mode.kind === "erase") {
       e.stopPropagation();
       commit((b) => ({
@@ -827,32 +938,29 @@ export default function BoardEditorPage() {
     </p>
   );
 
+  const selectedToken = soleToken();
+  const selectedMovement = soleMovement();
+
   const selectedLabel = (() => {
     if (!selected) return "";
-    if (selected.kind === "movement") {
-      const m = board.movements.find((x) => x.id === selected.id);
-      return m ? `${MOVEMENT_STYLE[m.type].label} arrow` : "Arrow";
+    const n = selCount(selected);
+    if (n > 1) return `${n} items`;
+    if (selectedMovement)
+      return `${MOVEMENT_STYLE[selectedMovement.type].label} arrow`;
+    if (selected.measures.length === 1) return "Distance marker";
+    if (selectedToken) {
+      return selectedToken.type === "player"
+        ? `Player ${selectedToken.label ?? ""}`.trim()
+        : TOKEN_LABELS[selectedToken.type];
     }
-    if (selected.kind === "measure") return "Distance marker";
-    if (selected.ids.length > 1) return `${selected.ids.length} items`;
-    const t = board.tokens.find((x) => x.id === selected.ids[0]);
-    if (!t) return "";
-    return t.type === "player"
-      ? `Player ${t.label ?? ""}`.trim()
-      : TOKEN_LABELS[t.type];
+    return "Item";
   })();
-
-  const selectedToken =
-    selected?.kind === "tokens" && selected.ids.length === 1
-      ? board.tokens.find((t) => t.id === selected.ids[0])
-      : undefined;
 
   const selectionBar = selected ? (
     <div className="flex flex-col gap-2 rounded-lg border border-pitch bg-emerald-50 px-3 py-2">
       <div className="flex items-center justify-between gap-2">
         <span className="min-w-0 truncate text-sm font-semibold text-pitch">
-          {selectedLabel} selected
-          {selected.kind === "tokens" ? " — drag to move" : ""}
+          {selectedLabel} selected — drag to move
         </span>
         <div className="flex shrink-0 gap-2">
           <button
@@ -888,6 +996,51 @@ export default function BoardEditorPage() {
           ))}
         </div>
       )}
+      {selectedToken?.type === "player" && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-xs font-medium text-stone-500">Number:</span>
+          {PLAYER_NUMBERS.map((n) => (
+            <button
+              key={n}
+              onClick={() => renumberSelectedPlayer(n)}
+              aria-pressed={selectedToken.label === String(n)}
+              className={`h-8 w-8 rounded-full border text-xs font-bold ${
+                selectedToken.label === String(n)
+                  ? "border-pitch bg-pitch text-white"
+                  : "border-stone-300 bg-white text-stone-600"
+              }`}
+            >
+              {n}
+            </button>
+          ))}
+          <button
+            onClick={() => renumberSelectedPlayer(undefined)}
+            aria-label="No number"
+            className="min-h-[32px] rounded-full border border-stone-300 bg-white px-2 text-xs font-medium text-stone-500"
+          >
+            None
+          </button>
+        </div>
+      )}
+      {selectedMovement && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-xs font-medium text-stone-500">Type:</span>
+          {MOVEMENT_TYPES.map((m) => (
+            <button
+              key={m}
+              onClick={() => retypeSelectedMovement(m)}
+              aria-pressed={selectedMovement.type === m}
+              className={`min-h-[32px] rounded-full border px-2.5 text-xs font-semibold ${
+                selectedMovement.type === m
+                  ? "border-pitch bg-pitch text-white"
+                  : "border-stone-300 bg-white text-stone-600"
+              }`}
+            >
+              {MOVEMENT_STYLE[m].label}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   ) : null;
 
@@ -915,20 +1068,23 @@ export default function BoardEditorPage() {
     </div>
   );
 
-  // a red round × the coach taps to delete the selected item
+  // a red round × the coach taps to delete the selected item; it sits clear
+  // of the item and only fires on release, so grabbing the item to drag it
+  // can never delete it by accident
   const deleteButton = (bx: number, by: number) => (
     <g
-      transform={`translate(${Math.min(PITCH_W - 3, Math.max(3, bx))} ${Math.min(
-        PITCH_H - 3,
-        Math.max(3, by)
+      transform={`translate(${Math.min(PITCH_W - 4, Math.max(4, bx))} ${Math.min(
+        PITCH_H - 4,
+        Math.max(4, by)
       )})`}
-      onPointerDown={(e) => {
+      onPointerDown={(e) => e.stopPropagation()}
+      onPointerUp={(e) => {
         e.stopPropagation();
         deleteSelected();
       }}
       style={{ cursor: "pointer" }}
     >
-      <circle r={6} fill="transparent" />
+      <circle r={4} fill="transparent" />
       <circle r={3.2} fill="#e11d48" stroke="#fff" strokeWidth={0.5} />
       <line x1={-1.4} y1={-1.4} x2={1.4} y2={1.4} stroke="#fff" strokeWidth={0.8} strokeLinecap="round" />
       <line x1={-1.4} y1={1.4} x2={1.4} y2={-1.4} stroke="#fff" strokeWidth={0.8} strokeLinecap="round" />
@@ -949,48 +1105,55 @@ export default function BoardEditorPage() {
   );
 
   let selectionOverlay: React.ReactNode = null;
-  if (selected?.kind === "tokens") {
-    const sel = board.tokens.filter((t) => selected.ids.includes(t.id));
-    if (sel.length > 0) {
-      const first = sel[0];
-      const firstPos = animPositions?.get(first.id) ?? first;
-      selectionOverlay = (
-        <g>
-          {sel.map((t) => {
-            const pos = animPositions?.get(t.id) ?? t;
-            return <g key={t.id}>{selectionRing(pos)}</g>;
-          })}
-          {sel.length === 1 && deleteButton(firstPos.x + 5.5, firstPos.y - 5.5)}
-        </g>
-      );
+  if (selected) {
+    const selTk = board.tokens.filter((t) => selected.tokens.includes(t.id));
+    const selMv = board.movements.filter((m) =>
+      selected.movements.includes(m.id)
+    );
+    const selMs = (board.measures ?? []).filter((m) =>
+      selected.measures.includes(m.id)
+    );
+    const one = selCount(selected) === 1;
+    let deleteAt: Pt | null = null;
+    if (one) {
+      if (selTk.length === 1) {
+        const pos = animPositions?.get(selTk[0].id) ?? selTk[0];
+        deleteAt = { x: pos.x + 7, y: pos.y - 7 };
+      } else if (selMv.length === 1 && selMv[0].points.length > 0) {
+        const mid = selMv[0].points[Math.floor(selMv[0].points.length / 2)];
+        deleteAt = { x: mid.x, y: mid.y - 8.5 };
+      } else if (selMs.length === 1) {
+        deleteAt = {
+          x: (selMs[0].a.x + selMs[0].b.x) / 2,
+          y: (selMs[0].a.y + selMs[0].b.y) / 2 + 8.5,
+        };
+      }
     }
-  } else if (selected?.kind === "movement") {
-    const mv = board.movements.find((x) => x.id === selected.id);
-    if (mv && mv.points.length > 0) {
-      const mid = mv.points[Math.floor(mv.points.length / 2)];
-      selectionOverlay = (
-        <g>
-          <MovementGlyph movement={{ ...mv, id: "sel-highlight" }} preview />
-          {deleteButton(mid.x, mid.y - 5)}
-        </g>
-      );
-    }
-  } else if (selected?.kind === "measure") {
-    const ms = (board.measures ?? []).find((x) => x.id === selected.id);
-    if (ms) {
-      const mid = { x: (ms.a.x + ms.b.x) / 2, y: (ms.a.y + ms.b.y) / 2 };
-      selectionOverlay = (
-        <g>
+    selectionOverlay = (
+      <g>
+        {selTk.map((t) => {
+          const pos = animPositions?.get(t.id) ?? t;
+          return <g key={t.id}>{selectionRing(pos)}</g>;
+        })}
+        {selMv.map((m) => (
+          <MovementGlyph
+            key={m.id}
+            movement={{ ...m, id: `sel-${m.id}` }}
+            preview
+          />
+        ))}
+        {selMs.map((m) => (
           <MeasureGlyph
-            measure={ms}
+            key={m.id}
+            measure={m}
             widthM={widthM}
             screenDelta={landscape ? -90 : 0}
             preview
           />
-          {deleteButton(mid.x, mid.y + 5)}
-        </g>
-      );
-    }
+        ))}
+        {deleteAt && deleteButton(deleteAt.x, deleteAt.y)}
+      </g>
+    );
   }
 
   // ghost preview of the tool being placed, following the mouse — hidden
