@@ -21,8 +21,10 @@ import {
   Pitch,
   TOKEN_LABELS,
   TokenGlyph,
-  pointAlong,
+  snapToGrid,
+  surfaceFor,
 } from "../BoardCanvas";
+import { runSequentialPlay } from "../boardPlay";
 
 type Mode =
   | { kind: "move" }
@@ -66,6 +68,8 @@ export default function BoardEditorPage() {
   const [coneColor, setConeColor] = useState(CONE_COLORS[0].fill);
   // null = automatic numbering (next free number)
   const [playerNum, setPlayerNum] = useState<number | null>(null);
+  // grid lock — snap placement/moves to the grid so cones line up
+  const [snap, setSnap] = useState(false);
 
   // Landscape pitch when the window is wider than tall (desktop, rotated
   // phone/tablet); portrait pitch otherwise.
@@ -91,54 +95,17 @@ export default function BoardEditorPage() {
     string,
     { x: number; y: number }
   > | null>(null);
-  const animRaf = useRef(0);
+  const playCancel = useRef<(() => void) | null>(null);
 
-  useEffect(() => () => cancelAnimationFrame(animRaf.current), []);
+  useEffect(() => () => playCancel.current?.(), []);
 
   function play() {
     if (!board || playing) return;
-    // pair each arrow with the nearest unclaimed token at its start
-    const assignments: { tokenId: string; movement: BoardMovement }[] = [];
-    const used = new Set<string>();
-    for (const m of board.movements) {
-      if (m.points.length < 2) continue;
-      let best: BoardToken | null = null;
-      let bestD = Infinity;
-      for (const t of board.tokens) {
-        if (used.has(t.id)) continue;
-        const d = Math.hypot(t.x - m.points[0].x, t.y - m.points[0].y);
-        if (d < bestD) {
-          bestD = d;
-          best = t;
-        }
-      }
-      if (best && bestD <= 10) {
-        assignments.push({ tokenId: best.id, movement: m });
-        used.add(best.id);
-      }
-    }
-    if (assignments.length === 0) return;
     setPlaying(true);
-    const startTs = performance.now();
-    const DURATION = 2800;
-    const tick = (nowTs: number) => {
-      const t = Math.min(1, (nowTs - startTs) / DURATION);
-      const ease = t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2;
-      setAnimPositions(
-        new Map(
-          assignments.map((a) => [a.tokenId, pointAlong(a.movement, ease)])
-        )
-      );
-      if (t < 1) {
-        animRaf.current = requestAnimationFrame(tick);
-      } else {
-        window.setTimeout(() => {
-          setAnimPositions(null);
-          setPlaying(false);
-        }, 800);
-      }
-    };
-    animRaf.current = requestAnimationFrame(tick);
+    playCancel.current = runSequentialPlay(board, setAnimPositions, () => {
+      setAnimPositions(null);
+      setPlaying(false);
+    });
   }
 
   async function shareImage() {
@@ -278,6 +245,16 @@ export default function BoardEditorPage() {
     setSelected(null);
   }
 
+  function recolorSelectedCone(fill: string) {
+    if (!selected || selected.kind !== "token") return;
+    setConeColor(fill);
+    commit((b) => ({
+      tokens: b.tokens.map((t) =>
+        t.id === selected.id ? { ...t, color: fill } : t
+      ),
+    }));
+  }
+
   function undo() {
     if (!board || undoStack.length === 0) return;
     const last = undoStack[undoStack.length - 1];
@@ -330,7 +307,14 @@ export default function BoardEditorPage() {
       commit((b) => ({
         tokens: [
           ...b.tokens,
-          { id: newId(), type: mode.token, x: p.x, y: p.y, label, color },
+          {
+            id: newId(),
+            type: mode.token,
+            x: snapToGrid(p.x, snap),
+            y: snapToGrid(p.y, snap),
+            label,
+            color,
+          },
         ],
       }));
     } else if (mode.kind === "draw") {
@@ -352,7 +336,9 @@ export default function BoardEditorPage() {
       persist({
         ...board,
         tokens: board.tokens.map((t) =>
-          t.id === dragTokenId.current ? { ...t, x: p.x, y: p.y } : t
+          t.id === dragTokenId.current
+            ? { ...t, x: snapToGrid(p.x, snap), y: snapToGrid(p.y, snap) }
+            : t
         ),
       });
     } else if (drawPoints.current.length > 0 && mode.kind === "draw") {
@@ -579,25 +565,51 @@ export default function BoardEditorPage() {
       : TOKEN_LABELS[t.type];
   })();
 
+  const selectedToken =
+    selected?.kind === "token"
+      ? board.tokens.find((t) => t.id === selected.id)
+      : undefined;
+
   const selectionBar = selected ? (
-    <div className="flex items-center justify-between gap-2 rounded-lg border border-pitch bg-emerald-50 px-3 py-2">
-      <span className="min-w-0 truncate text-sm font-semibold text-pitch">
-        {selectedLabel} selected — drag to move
-      </span>
-      <div className="flex shrink-0 gap-2">
-        <button
-          onClick={deleteSelected}
-          className="min-h-[44px] rounded-lg bg-rose-600 px-3 text-sm font-bold text-white"
-        >
-          🗑 Delete
-        </button>
-        <button
-          onClick={() => setSelected(null)}
-          className="min-h-[44px] rounded-lg border border-stone-300 bg-white px-3 text-sm font-medium text-stone-600"
-        >
-          Done
-        </button>
+    <div className="flex flex-col gap-2 rounded-lg border border-pitch bg-emerald-50 px-3 py-2">
+      <div className="flex items-center justify-between gap-2">
+        <span className="min-w-0 truncate text-sm font-semibold text-pitch">
+          {selectedLabel} selected — drag to move
+        </span>
+        <div className="flex shrink-0 gap-2">
+          <button
+            onClick={deleteSelected}
+            className="min-h-[44px] rounded-lg bg-rose-600 px-3 text-sm font-bold text-white"
+          >
+            🗑 Delete
+          </button>
+          <button
+            onClick={() => setSelected(null)}
+            className="min-h-[44px] rounded-lg border border-stone-300 bg-white px-3 text-sm font-medium text-stone-600"
+          >
+            Done
+          </button>
+        </div>
       </div>
+      {selectedToken?.type === "cone" && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-xs font-medium text-stone-500">Colour:</span>
+          {CONE_COLORS.map((c) => (
+            <button
+              key={c.fill}
+              onClick={() => recolorSelectedCone(c.fill)}
+              aria-label={`${c.name} cone`}
+              aria-pressed={selectedToken.color === c.fill}
+              className={`h-8 w-8 rounded-full border-2 ${
+                (selectedToken.color ?? CONE_COLORS[0].fill) === c.fill
+                  ? "border-pitch"
+                  : "border-stone-200"
+              }`}
+              style={{ backgroundColor: c.fill }}
+            />
+          ))}
+        </div>
+      )}
     </div>
   ) : null;
 
@@ -681,7 +693,7 @@ export default function BoardEditorPage() {
 
   const boardContent = (
     <>
-      <Pitch />
+      <Pitch variant={surfaceFor(board)} grid={snap} />
       {board.movements.map((m) => (
         <MovementGlyph
           key={m.id}
@@ -774,6 +786,19 @@ export default function BoardEditorPage() {
           className="min-h-[44px] shrink-0 rounded-lg border border-stone-300 bg-white px-3 text-sm font-semibold text-stone-600"
         >
           ⤴
+        </button>
+        <button
+          onClick={() => setSnap((v) => !v)}
+          aria-pressed={snap}
+          aria-label="Grid lock"
+          title="Snap to grid to line things up"
+          className={`min-h-[44px] shrink-0 rounded-lg border px-3 text-sm font-semibold ${
+            snap
+              ? "border-pitch bg-pitch text-white"
+              : "border-stone-300 bg-white text-stone-600"
+          }`}
+        >
+          # Grid
         </button>
         <button
           onClick={toggleFullscreen}

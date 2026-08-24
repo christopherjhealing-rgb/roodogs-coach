@@ -1,15 +1,16 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { Board, BoardMovement, BoardToken } from "@/lib/types";
+import type { Board } from "@/lib/types";
 import {
   MovementGlyph,
   PITCH_H,
   PITCH_W,
   Pitch,
   TokenGlyph,
-  pointAlong,
+  surfaceFor,
 } from "./BoardCanvas";
+import { canPlay as boardCanPlay, runSequentialPlay } from "./boardPlay";
 
 /**
  * Read-only board with a Play button that walks each token along the arrow
@@ -27,52 +28,20 @@ export default function AnimatedBoard({
   const [anim, setAnim] = useState<Map<string, { x: number; y: number }> | null>(
     null
   );
-  const raf = useRef(0);
+  const cancelRef = useRef<(() => void) | null>(null);
 
-  useEffect(() => () => cancelAnimationFrame(raf.current), []);
+  useEffect(() => () => cancelRef.current?.(), []);
 
   function play() {
     if (playing) return;
-    const assignments: { tokenId: string; movement: BoardMovement }[] = [];
-    const used = new Set<string>();
-    for (const m of board.movements) {
-      if (m.points.length < 2) continue;
-      let best: BoardToken | null = null;
-      let bestD = Infinity;
-      for (const t of board.tokens) {
-        if (used.has(t.id)) continue;
-        const d = Math.hypot(t.x - m.points[0].x, t.y - m.points[0].y);
-        if (d < bestD) {
-          bestD = d;
-          best = t;
-        }
-      }
-      if (best && bestD <= 10) {
-        assignments.push({ tokenId: best.id, movement: m });
-        used.add(best.id);
-      }
-    }
-    if (assignments.length === 0) return;
     setPlaying(true);
-    const startTs = performance.now();
-    const DURATION = 2800;
-    const tick = (nowTs: number) => {
-      const t = Math.min(1, (nowTs - startTs) / DURATION);
-      const ease = t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2;
-      setAnim(new Map(assignments.map((a) => [a.tokenId, pointAlong(a.movement, ease)])));
-      if (t < 1) {
-        raf.current = requestAnimationFrame(tick);
-      } else {
-        window.setTimeout(() => {
-          setAnim(null);
-          setPlaying(false);
-        }, 800);
-      }
-    };
-    raf.current = requestAnimationFrame(tick);
+    cancelRef.current = runSequentialPlay(board, setAnim, () => {
+      setAnim(null);
+      setPlaying(false);
+    });
   }
 
-  const canPlay = board.movements.some((m) => m.points.length >= 2);
+  const canPlay = boardCanPlay(board);
 
   return (
     <div className={`relative ${className}`}>
@@ -82,7 +51,7 @@ export default function AnimatedBoard({
         role="img"
         aria-label={`Diagram: ${board.name}`}
       >
-        <Pitch />
+        <Pitch variant={surfaceFor(board)} />
         {board.movements.map((m) => (
           <MovementGlyph key={m.id} movement={m} />
         ))}

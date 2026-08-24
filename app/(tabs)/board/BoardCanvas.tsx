@@ -2,6 +2,7 @@
 
 import type {
   Board,
+  BoardKind,
   BoardMovement,
   BoardToken,
   MovementType,
@@ -47,7 +48,40 @@ function coneStroke(fill: string): string {
   return CONE_COLORS.find((c) => c.fill === fill)?.stroke ?? "#ea580c";
 }
 
-export function Pitch() {
+export type Surface = "pitch" | "plain";
+
+/** Snap grid step, in pitch units. */
+export const GRID = 5;
+
+export function snapToGrid(v: number, on: boolean): number {
+  return on ? Math.round(v / GRID) * GRID : v;
+}
+
+/** Drills use a plain training field; set plays and games use a full pitch. */
+export function surfaceFor(board: { kind: BoardKind }): Surface {
+  return board.kind === "drill" ? "plain" : "pitch";
+}
+
+function GridLines() {
+  const lines = [];
+  for (let x = GRID; x < PITCH_W; x += GRID)
+    lines.push(
+      <line key={`v${x}`} x1={x} y1={0} x2={x} y2={PITCH_H} stroke="#fff" strokeWidth={0.25} opacity={0.18} />
+    );
+  for (let y = GRID; y < PITCH_H; y += GRID)
+    lines.push(
+      <line key={`h${y}`} x1={0} y1={y} x2={PITCH_W} y2={y} stroke="#fff" strokeWidth={0.25} opacity={0.18} />
+    );
+  return <g>{lines}</g>;
+}
+
+export function Pitch({
+  variant = "pitch",
+  grid = false,
+}: {
+  variant?: Surface;
+  grid?: boolean;
+}) {
   return (
     <g>
       <rect x={0} y={0} width={PITCH_W} height={PITCH_H} fill="#2f7a44" />
@@ -61,14 +95,19 @@ export function Pitch() {
         strokeWidth={0.5}
         opacity={0.9}
       />
-      {/* try lines */}
-      <line x1={2} y1={14} x2={PITCH_W - 2} y2={14} stroke="#fff" strokeWidth={0.5} />
-      <line x1={2} y1={PITCH_H - 14} x2={PITCH_W - 2} y2={PITCH_H - 14} stroke="#fff" strokeWidth={0.5} />
-      {/* halfway */}
-      <line x1={2} y1={PITCH_H / 2} x2={PITCH_W - 2} y2={PITCH_H / 2} stroke="#fff" strokeWidth={0.5} />
-      {/* dashed lines either side of halfway */}
-      <line x1={2} y1={42} x2={PITCH_W - 2} y2={42} stroke="#fff" strokeWidth={0.35} strokeDasharray="2 2" opacity={0.6} />
-      <line x1={2} y1={PITCH_H - 42} x2={PITCH_W - 2} y2={PITCH_H - 42} stroke="#fff" strokeWidth={0.35} strokeDasharray="2 2" opacity={0.6} />
+      {variant === "pitch" && (
+        <>
+          {/* try lines */}
+          <line x1={2} y1={14} x2={PITCH_W - 2} y2={14} stroke="#fff" strokeWidth={0.5} />
+          <line x1={2} y1={PITCH_H - 14} x2={PITCH_W - 2} y2={PITCH_H - 14} stroke="#fff" strokeWidth={0.5} />
+          {/* halfway */}
+          <line x1={2} y1={PITCH_H / 2} x2={PITCH_W - 2} y2={PITCH_H / 2} stroke="#fff" strokeWidth={0.5} />
+          {/* dashed lines either side of halfway */}
+          <line x1={2} y1={42} x2={PITCH_W - 2} y2={42} stroke="#fff" strokeWidth={0.35} strokeDasharray="2 2" opacity={0.6} />
+          <line x1={2} y1={PITCH_H - 42} x2={PITCH_W - 2} y2={PITCH_H - 42} stroke="#fff" strokeWidth={0.35} strokeDasharray="2 2" opacity={0.6} />
+        </>
+      )}
+      {grid && <GridLines />}
     </g>
   );
 }
@@ -280,7 +319,7 @@ export function BoardPreview({
       role="img"
       aria-label={`Diagram: ${board.name}`}
     >
-      <Pitch />
+      <Pitch variant={surfaceFor(board)} />
       {board.movements.map((m) => (
         <MovementGlyph key={m.id} movement={m} />
       ))}
