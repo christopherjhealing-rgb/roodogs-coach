@@ -14,12 +14,21 @@ import {
   playerGameTimeMs,
   suggestSub,
 } from "@/lib/gameTime";
+import { MATCH_AWARDS } from "@/lib/awards";
 import { newId, storage } from "@/lib/storage";
 import type { Match, MatchEvent, Player } from "@/lib/types";
 
 /** Player name prefixed with their jersey number, when they have one. */
 function withNo(p: { name: string; jersey?: number }): string {
   return p.jersey != null ? `#${p.jersey} ${p.name}` : p.name;
+}
+
+/** Roster order: jersey number, then name. */
+function byNumber(a: Player, b: Player): number {
+  const aj = a.jersey ?? 999;
+  const bj = b.jersey ?? 999;
+  if (aj !== bj) return aj - bj;
+  return a.name.localeCompare(b.name);
 }
 
 interface UndoToast {
@@ -39,6 +48,10 @@ export default function MatchDetailPage() {
   const [starterIds, setStarterIds] = useState<string[]>([]);
   const [selectedOn, setSelectedOn] = useState<string | null>(null);
   const [selectedBench, setSelectedBench] = useState<string | null>(null);
+  // bench can be collapsed during play to fit more on-field players on screen
+  const [showBench, setShowBench] = useState(true);
+  // which award's player picker is expanded at full-time
+  const [openAward, setOpenAward] = useState<string | null>(null);
   const [toast, setToast] = useState<UndoToast | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -112,10 +125,10 @@ export default function MatchDetailPage() {
   const onField = fieldIds
     .map((id) => byId.get(id))
     .filter((p): p is Player => p !== undefined)
-    .sort((a, b) => a.name.localeCompare(b.name));
+    .sort(byNumber);
   const bench = squad
     .filter((p) => !fieldIds.includes(p.id))
-    .sort((a, b) => a.name.localeCompare(b.name));
+    .sort(byNumber);
 
   const timeById = new Map(
     squad.map((p) => [
@@ -236,6 +249,29 @@ export default function MatchDetailPage() {
     );
   }
 
+  /** Toggle a post-match award for a player. */
+  function setAward(awardId: string, playerId: string) {
+    if (!match) return;
+    const next = { ...(match.awards ?? {}) };
+    if (next[awardId] === playerId) delete next[awardId];
+    else next[awardId] = playerId;
+    saveMatch({
+      ...match,
+      awards: next,
+      // keep the legacy field in step so older stats reads still work
+      ...(awardId === "player" ? { playerOfMatchId: next[awardId] } : {}),
+    });
+    setOpenAward(null);
+  }
+
+  /** Current holder of an award, falling back to the legacy POTM field. */
+  function awardHolder(awardId: string): string | undefined {
+    return (
+      match?.awards?.[awardId] ??
+      (awardId === "player" ? match?.playerOfMatchId : undefined)
+    );
+  }
+
   const ourTries = events.filter((e) => e.type === "try").length;
 
   return (
@@ -258,7 +294,7 @@ export default function MatchDetailPage() {
           <div className="flex flex-wrap gap-2">
             {squad
               .slice()
-              .sort((a, b) => a.name.localeCompare(b.name))
+              .sort(byNumber)
               .map((p) => {
                 const on = starterIds.includes(p.id);
                 return (
@@ -367,16 +403,40 @@ export default function MatchDetailPage() {
             </section>
           )}
 
-          <p className="text-center text-xs text-stone-400">
-            Tap one player on each side to swap them.
-          </p>
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs text-stone-400">
+              {showBench
+                ? "Tap one player on each side to swap them."
+                : "Bench hidden — more players on screen."}
+            </p>
+            <button
+              onClick={() => setShowBench((v) => !v)}
+              aria-pressed={!showBench}
+              className="min-h-[40px] shrink-0 rounded-lg border border-stone-300 bg-white px-3 text-sm font-semibold text-stone-600"
+            >
+              {showBench ? "Hide bench" : `Show bench (${bench.length})`}
+            </button>
+          </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div
+            className={
+              showBench
+                ? "grid grid-cols-2 gap-3 items-start"
+                : "flex flex-col gap-1.5"
+            }
+          >
             <section className="flex flex-col gap-1.5">
               <h2 className="text-center text-xs font-bold uppercase tracking-wide text-pitch">
                 On field ({onField.length})
               </h2>
-              {onField.map((p) => {
+              <div
+                className={
+                  showBench
+                    ? "flex flex-col gap-1.5"
+                    : "grid grid-cols-2 gap-2 sm:grid-cols-3"
+                }
+              >
+                {onField.map((p) => {
                 const selected = selectedOn === p.id;
                 const t = timeById.get(p.id) ?? 0;
                 return (
@@ -434,8 +494,10 @@ export default function MatchDetailPage() {
                   </div>
                 );
               })}
+              </div>
             </section>
 
+            {showBench && (
             <section className="flex flex-col gap-1.5">
               <h2 className="text-center text-xs font-bold uppercase tracking-wide text-stone-500">
                 Bench ({bench.length})
@@ -475,6 +537,7 @@ export default function MatchDetailPage() {
                 );
               })}
             </section>
+            )}
           </div>
         </>
       )}
@@ -488,39 +551,63 @@ export default function MatchDetailPage() {
             {formatClock(fairness.spreadMs)}
           </p>
 
-          <section className="rounded-xl border border-stone-200 bg-white p-3">
+          <section className="flex flex-col gap-2">
             <h2 className="text-sm font-semibold">
-              🏅 Player of the match{" "}
+              Awards{" "}
               <span className="font-normal text-stone-400">(optional)</span>
             </h2>
-            <div className="flex flex-wrap gap-1.5 pt-2">
-              {squad
-                .slice()
-                .sort((a, b) => a.name.localeCompare(b.name))
-                .map((p) => {
-                  const chosen = match.playerOfMatchId === p.id;
-                  return (
-                    <button
-                      key={p.id}
-                      onClick={() =>
-                        saveMatch({
-                          ...match,
-                          playerOfMatchId: chosen ? undefined : p.id,
-                        })
-                      }
-                      aria-pressed={chosen}
-                      className={`min-h-[44px] rounded-full border px-3 text-sm font-medium ${
-                        chosen
-                          ? "border-amber-500 bg-amber-400 text-amber-950"
-                          : "border-stone-300 bg-white text-stone-600"
-                      }`}
-                    >
-                      {chosen ? "🏅 " : ""}
-                      {withNo(p)}
-                    </button>
-                  );
-                })}
-            </div>
+            {MATCH_AWARDS.map((a) => {
+              const holderId = awardHolder(a.id);
+              const holder = holderId ? byId.get(holderId) : undefined;
+              const open = openAward === a.id;
+              return (
+                <div
+                  key={a.id}
+                  className="overflow-hidden rounded-xl border border-stone-200 bg-white"
+                >
+                  <button
+                    onClick={() => setOpenAward(open ? null : a.id)}
+                    aria-expanded={open}
+                    className="flex min-h-[52px] w-full items-center justify-between gap-2 px-3 py-2 text-left"
+                  >
+                    <span className="font-semibold">
+                      {a.emoji} {a.label}
+                    </span>
+                    <span className="flex shrink-0 items-center gap-1 text-sm text-stone-500">
+                      <span className="max-w-[9rem] truncate">
+                        {holder ? withNo(holder) : "Tap to pick"}
+                      </span>
+                      <span aria-hidden>{open ? "▾" : "▸"}</span>
+                    </span>
+                  </button>
+                  {open && (
+                    <div className="flex flex-wrap gap-1.5 border-t border-stone-100 px-3 py-2.5">
+                      {squad
+                        .slice()
+                        .sort(byNumber)
+                        .map((p) => {
+                          const chosen = holderId === p.id;
+                          return (
+                            <button
+                              key={p.id}
+                              onClick={() => setAward(a.id, p.id)}
+                              aria-pressed={chosen}
+                              className={`min-h-[44px] rounded-full border px-3 text-sm font-medium ${
+                                chosen
+                                  ? "border-amber-500 bg-amber-400 text-amber-950"
+                                  : "border-stone-300 bg-white text-stone-600"
+                              }`}
+                            >
+                              {chosen ? `${a.emoji} ` : ""}
+                              {withNo(p)}
+                            </button>
+                          );
+                        })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </section>
           <label className="flex flex-col gap-1 text-sm font-medium">
             Result <span className="font-normal text-stone-400">(optional)</span>

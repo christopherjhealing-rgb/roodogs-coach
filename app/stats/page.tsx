@@ -9,6 +9,7 @@ import {
   playerGameTimeMs,
 } from "@/lib/gameTime";
 import { storage } from "@/lib/storage";
+import { MATCH_AWARDS } from "@/lib/awards";
 import { useDataVersion } from "@/components/SyncProvider";
 
 interface PlayerSeason {
@@ -21,7 +22,8 @@ interface PlayerSeason {
   steals: number;
   lost: number;
   trainings: number;
-  potm: number;
+  /** Post-match awards won, by award id. */
+  awards: Record<string, number>;
 }
 
 interface Badge {
@@ -36,11 +38,15 @@ function badgesFor(
   totalRolledSessions: number
 ): Badge[] {
   const badges: Badge[] = [];
-  if (r.potm > 0)
-    badges.push({
-      emoji: "🏅",
-      label: r.potm === 1 ? "Player of the match" : `Player of the match ×${r.potm}`,
-    });
+  // one badge per award a player has won this season
+  for (const a of MATCH_AWARDS) {
+    const n = r.awards[a.id] ?? 0;
+    if (n > 0)
+      badges.push({
+        emoji: a.emoji,
+        label: n === 1 ? a.label : `${a.label} ×${n}`,
+      });
+  }
   if (r.tries > 0) badges.push({ emoji: "🎉", label: "Try scorer" });
   if (r.tackles >= 10) badges.push({ emoji: "💪", label: "10+ tackles" });
   if (totalMatches >= 3 && r.games === totalMatches)
@@ -81,7 +87,7 @@ export default function StatsPage() {
           steals: 0,
           lost: 0,
           trainings: 0,
-          potm: 0,
+          awards: {},
         },
       ])
     );
@@ -104,7 +110,14 @@ export default function StatsPage() {
         row.tackles += countEvents(events, row.id, "tackle");
         row.steals += countEvents(events, row.id, "steal");
         row.lost += countEvents(events, row.id, "lost");
-        if (match.playerOfMatchId === row.id) row.potm += 1;
+      }
+      // tally awards once per match (fold the legacy POTM field into "player")
+      const awarded = { ...(match.awards ?? {}) };
+      if (match.playerOfMatchId && !awarded.player)
+        awarded.player = match.playerOfMatchId;
+      for (const [awardId, playerId] of Object.entries(awarded)) {
+        const row = totals.get(playerId);
+        if (row) row.awards[awardId] = (row.awards[awardId] ?? 0) + 1;
       }
     }
     for (const session of rolled) {

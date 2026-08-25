@@ -91,11 +91,17 @@ Five bottom-nav tabs, components colocated by feature under `app/(tabs)/`:
    (two-column sub swapping, per-player try/tackle with undo toast, pause for
    halftime, needs-minutes highlight, fairness tip suggesting the next sub
    once the gap passes 4 minutes), break-time fairness summary, full-time
-   summary with an optional player-of-the-match pick (`playerOfMatchId`)
+   summary. Line-ups (starting picker, on-field, bench) sort by jersey number.
+   The bench collapses via a toggle during play to fit more on-field players.
+   At full-time the coach picks post-match **awards** (Try/Attacker/Tackle/
+   Player of the day, plus Player of the week) from an accordion — defined in
+   `lib/awards.ts`, stored on `match.awards` (award id → player id); the legacy
+   `playerOfMatchId` is kept in step with `awards.player`.
 
 Plus `/stats` (linked from the Match tab): season totals per player
-including trainings attended, positive-only milestone badges, and CSV
-export via the share sheet.
+including trainings attended, positive-only milestone badges (including one
+per award won, tallied from `match.awards`), and CSV export via the share
+sheet.
 
 ## Cross-device sync
 

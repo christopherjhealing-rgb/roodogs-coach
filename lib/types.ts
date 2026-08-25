@@ -75,8 +75,11 @@ export interface Match {
   /** Clock bookkeeping — game time is computed from event overlap with
    *  these periods, so halftime never counts toward anyone's minutes. */
   clockPeriods?: ClockPeriod[];
-  /** Positive-only award picked after full-time. */
+  /** Positive-only award picked after full-time (legacy — Player of the day
+   *  now also lives in `awards.player`; read both for older matches). */
   playerOfMatchId?: string;
+  /** Post-match awards: award id (see lib/awards.ts) → player id. */
+  awards?: Record<string, string>;
 }
 
 export type MatchEventType =
