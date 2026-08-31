@@ -139,21 +139,23 @@ export default function FormationView({ roster }: { roster: Player[] }) {
         onPointerUp={onPointerUp}
         onPointerCancel={() => setDrag(null)}
       >
-        <rect x={0} y={0} width={VIEW_W} height={VIEW_H} fill="#2f7a44" />
+        {/* light tactical-board look, matched to the whiteboard and drills */}
+        <rect x={0} y={0} width={VIEW_W} height={VIEW_H} fill="#f2f5ef" />
         <rect
           x={2}
           y={2}
           width={VIEW_W - 4}
           height={VIEW_H - 4}
           fill="none"
-          stroke="#fff"
+          stroke="#2F6B3A"
           strokeWidth={0.7}
-          opacity={0.9}
+          strokeDasharray="3.5 2.5"
+          opacity={0.5}
         />
-        <text x={8} y={13} fontSize={6} fontWeight={700} fill="#ffffff" opacity={0.85}>
+        <text x={8} y={13} fontSize={6} fontWeight={700} fill="#1E5B3C">
           Forwards — scrum
         </text>
-        <text x={8} y={152} fontSize={6} fontWeight={700} fill="#ffffff" opacity={0.85}>
+        <text x={8} y={152} fontSize={6} fontWeight={700} fill="#1E5B3C">
           Backs — back line
         </text>
         {SLOTS.map((slot) => {
@@ -172,13 +174,13 @@ export default function FormationView({ roster }: { roster: Player[] }) {
               <circle r={11} fill="transparent" />
               {player ? (
                 <>
-                  <circle r={7.5} fill="#ffffff" stroke="#12332A" strokeWidth={1.1} />
+                  <circle r={7.5} fill="#1E5B3C" stroke="#12332A" strokeWidth={0.9} />
                   <text
                     textAnchor="middle"
                     dy={2.3}
                     fontSize={6.5}
                     fontWeight={700}
-                    fill="#12332A"
+                    fill="#ffffff"
                     pointerEvents="none"
                   >
                     {player.jersey ?? "•"}
@@ -188,8 +190,8 @@ export default function FormationView({ roster }: { roster: Player[] }) {
                     dy={15.5}
                     fontSize={5.6}
                     fontWeight={700}
-                    fill="#ffffff"
-                    stroke="#12332A"
+                    fill="#12332A"
+                    stroke="#f2f5ef"
                     strokeWidth={0.9}
                     paintOrder="stroke"
                     pointerEvents="none"
@@ -200,7 +202,7 @@ export default function FormationView({ roster }: { roster: Player[] }) {
                     textAnchor="middle"
                     dy={21.5}
                     fontSize={4}
-                    fill="#bbf7d0"
+                    fill="#5B6878"
                     pointerEvents="none"
                   >
                     {slot.label}
@@ -211,17 +213,16 @@ export default function FormationView({ roster }: { roster: Player[] }) {
                   <circle
                     r={7.5}
                     fill="none"
-                    stroke="#ffffff"
+                    stroke="#1E5B3C"
                     strokeWidth={0.9}
                     strokeDasharray="2.2 1.6"
-                    opacity={0.55}
+                    opacity={0.45}
                   />
                   <text
                     textAnchor="middle"
                     dy={15.5}
                     fontSize={4.4}
-                    fill="#ffffff"
-                    opacity={0.6}
+                    fill="#5B6878"
                     pointerEvents="none"
                   >
                     {slot.label}

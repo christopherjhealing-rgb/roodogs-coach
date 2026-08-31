@@ -247,9 +247,10 @@ function SyncBadge({ status }: { status: SyncStatus }) {
   if (!m) return null;
 
   return (
+    // Bottom-left so it never covers page-header buttons: clears the bottom
+    // nav on phones, sits in the sidebar's empty corner on desktop.
     <div
-      className="pointer-events-none fixed right-3 top-3 z-50 flex items-center gap-1.5 rounded-full border border-stone-200 bg-white/95 px-2.5 py-1 text-xs font-medium shadow-sm"
-      style={{ top: "calc(env(safe-area-inset-top, 0px) + 0.75rem)" }}
+      className="pointer-events-none fixed bottom-24 left-3 z-50 flex items-center gap-1.5 rounded-full border border-stone-200 bg-white/95 px-2.5 py-1 text-xs font-medium shadow-sm md:bottom-3"
       role="status"
       aria-live="polite"
     >
