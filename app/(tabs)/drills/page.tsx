@@ -3,19 +3,24 @@
 import { useEffect, useState } from "react";
 import { newId, storage } from "@/lib/storage";
 import { ensureSeedData } from "@/lib/ensureSeed";
+import { coneSetup } from "@/lib/coneSetup";
 import { useDataVersion } from "@/components/SyncProvider";
-import type { Board, Drill, DrillTag } from "@/lib/types";
+import type { Board, Drill, DrillTag, Session } from "@/lib/types";
 import { BoardPreview } from "../board/BoardCanvas";
 import SpecDiagram from "@/components/drills/SpecDiagram";
 import DrillForm from "./DrillForm";
 import DrillViewer from "./DrillViewer";
+import { drillMatches } from "./search";
 import { ALL_TAGS, TAG_BADGE_CLASSES, TAG_LABELS } from "./tags";
 
 export default function DrillsPage() {
   const [drills, setDrills] = useState<Drill[]>([]);
   const [boards, setBoards] = useState<Board[]>([]);
+  const [sessions, setSessions] = useState<Session[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [filter, setFilter] = useState<DrillTag | "all">("all");
+  const [query, setQuery] = useState("");
+  const [setupFilter, setSetupFilter] = useState("all");
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [viewing, setViewing] = useState<Drill | null>(null);
@@ -28,6 +33,7 @@ export default function DrillsPage() {
     ensureSeedData();
     setDrills(storage.getDrills());
     setBoards(storage.getBoards());
+    setSessions(storage.getSessions());
     setLoaded(true);
   }, [dataVersion]);
 
@@ -42,7 +48,8 @@ export default function DrillsPage() {
   }
 
   function updateDrill(id: string, data: Omit<Drill, "id">) {
-    save(drills.map((d) => (d.id === id ? { id, ...data } : d)));
+    // merge, so fields the form doesn't carry (level, source…) survive an edit
+    save(drills.map((d) => (d.id === id ? { ...d, ...data } : d)));
     setEditingId(null);
   }
 
@@ -52,8 +59,43 @@ export default function DrillsPage() {
     setEditingId(null);
   }
 
+  /** Append the viewed drill to a session (null = start a new one for today).
+   *  Returns the session's id so the viewer can show where it went. */
+  function addToSession(sessionId: string | null, drill: Drill): string {
+    let next: Session[];
+    let targetId: string;
+    if (sessionId === null) {
+      targetId = newId();
+      next = [
+        ...sessions,
+        {
+          id: targetId,
+          date: new Date().toISOString().slice(0, 10),
+          drillIds: [drill.id],
+          notes: "",
+        },
+      ];
+    } else {
+      targetId = sessionId;
+      next = sessions.map((s) =>
+        s.id === sessionId && !s.drillIds.includes(drill.id)
+          ? { ...s, drillIds: [...s.drillIds, drill.id] }
+          : s
+      );
+    }
+    setSessions(next);
+    storage.setSessions(next);
+    return targetId;
+  }
+
+  const setupOptions = [...new Set(drills.map((d) => coneSetup(d)))].sort(
+    (a, b) => a.localeCompare(b)
+  );
+
   const visible = drills
     .filter((d) => filter === "all" || d.tags.includes(filter))
+    .filter((d) => setupFilter === "all" || coneSetup(d) === setupFilter)
+    .filter((d) => drillMatches(d, query))
     .sort((a, b) => a.name.localeCompare(b.name));
 
   return (
@@ -80,6 +122,30 @@ export default function DrillsPage() {
           </button>
         )}
       </header>
+
+      <div className="flex flex-wrap gap-2">
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search drills…"
+          aria-label="Search drills"
+          className="min-h-[48px] min-w-0 flex-1 rounded-lg border border-stone-300 px-3 text-base outline-none focus:border-pitch focus:ring-1 focus:ring-pitch"
+        />
+        <select
+          value={setupFilter}
+          onChange={(e) => setSetupFilter(e.target.value)}
+          aria-label="Filter by cone set"
+          className="min-h-[48px] max-w-[46%] rounded-lg border border-stone-300 bg-white px-2 text-sm outline-none focus:border-pitch"
+        >
+          <option value="all">All cone sets</option>
+          {setupOptions.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </select>
+      </div>
 
       <div className="-mx-4 overflow-x-auto px-4">
         <div className="flex w-max gap-2 pb-1">
@@ -192,6 +258,9 @@ export default function DrillsPage() {
                     Gear: {drill.equipment}
                   </span>
                 )}
+                <span className="text-xs text-stone-400">
+                  <span aria-hidden>🔺</span> {coneSetup(drill)}
+                </span>
                 {drill.easier && (
                   <span className="text-xs text-stone-500">
                     <span className="font-semibold text-sky-700">Easier:</span>{" "}
@@ -213,17 +282,18 @@ export default function DrillsPage() {
                   className="relative block w-full border-t border-stone-100 bg-stone-50 p-3 active:bg-stone-100"
                   aria-label={`Watch ${drill.name}`}
                 >
-                  {drill.diagramSpec ? (
+                  {board ? (
+                    // a coach-drawn board overrides the library diagram
+                    <BoardPreview
+                      board={board}
+                      className="mx-auto w-36 rounded-lg border border-stone-200"
+                    />
+                  ) : (
                     <SpecDiagram
-                      spec={drill.diagramSpec}
+                      spec={drill.diagramSpec!}
                       name={drill.name}
                       animate={false}
                       className="mx-auto w-40 rounded-lg border border-stone-200 bg-white p-1"
-                    />
-                  ) : (
-                    <BoardPreview
-                      board={board!}
-                      className="mx-auto w-36 rounded-lg border border-stone-200"
                     />
                   )}
                   <span className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-pitch px-3 py-1 text-xs font-bold text-white shadow">
@@ -244,6 +314,8 @@ export default function DrillsPage() {
               ? boards.find((b) => b.id === viewing.boardId)
               : undefined
           }
+          sessions={sessions}
+          onAddToSession={(sessionId) => addToSession(sessionId, viewing)}
           onClose={() => setViewing(null)}
         />
       )}

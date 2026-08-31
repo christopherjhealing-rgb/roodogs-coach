@@ -55,6 +55,9 @@ export interface Drill {
   players?: string;
   /** Playing area, e.g. "15m x 20m". */
   area?: string;
+  /** Cone-set label override for grouping drills that share a setup;
+   *  derived from `area` when unset (see lib/coneSetup.ts). */
+  setup?: string;
   /** How age-appropriate as written. */
   level?: DrillLevel;
   /** Where the drill came from. */

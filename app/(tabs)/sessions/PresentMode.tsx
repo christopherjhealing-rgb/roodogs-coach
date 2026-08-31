@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Board, Drill } from "@/lib/types";
 import AnimatedBoard from "../board/AnimatedBoard";
 import SpecDiagram from "@/components/drills/SpecDiagram";
+import { coneSetup } from "@/lib/coneSetup";
 import { TAG_BADGE_CLASSES, TAG_LABELS } from "../drills/tags";
 
 /** Fullscreen drill-by-drill walkthrough for running a session at training. */
@@ -63,16 +64,25 @@ export default function PresentMode({
             </span>
           ))}
         </div>
-        {drill.diagramSpec ? (
+        <p className="text-sm text-emerald-200">
+          <span aria-hidden>🔺</span> {coneSetup(drill)}
+          {index > 0 && coneSetup(drills[index - 1]) === coneSetup(drill) && (
+            <span className="font-bold text-amber-300">
+              {" "}
+              — same cones as the last drill, leave them where they are
+            </span>
+          )}
+        </p>
+        {board ? (
+          <AnimatedBoard
+            board={board}
+            className="mx-auto w-full max-w-[280px]"
+          />
+        ) : drill.diagramSpec ? (
           <SpecDiagram
             spec={drill.diagramSpec}
             name={drill.name}
             className="mx-auto w-full max-w-[280px] rounded-xl bg-white p-2"
-          />
-        ) : board ? (
-          <AnimatedBoard
-            board={board}
-            className="mx-auto w-full max-w-[280px]"
           />
         ) : null}
         {drill.description && (

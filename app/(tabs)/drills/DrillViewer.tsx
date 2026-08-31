@@ -1,8 +1,10 @@
 "use client";
 
-import type { Board, Drill } from "@/lib/types";
+import { useState } from "react";
+import type { Board, Drill, Session } from "@/lib/types";
 import AnimatedBoard from "../board/AnimatedBoard";
 import SpecDiagram from "@/components/drills/SpecDiagram";
+import { coneSetup } from "@/lib/coneSetup";
 import { TAG_BADGE_CLASSES, TAG_LABELS } from "./tags";
 
 const LEVEL_LABEL = {
@@ -11,16 +13,33 @@ const LEVEL_LABEL = {
   older: "Older juniors",
 } as const;
 
+function formatDate(iso: string): string {
+  const d = new Date(`${iso}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString("en-AU", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+}
+
 /** Fullscreen look at one drill: big playable diagram plus the detail. */
 export default function DrillViewer({
   drill,
   board,
+  sessions = [],
+  onAddToSession,
   onClose,
 }: {
   drill: Drill;
   board?: Board;
+  sessions?: Session[];
+  /** Add this drill to a session (null = start a new one); returns its id. */
+  onAddToSession?: (sessionId: string | null) => string;
   onClose: () => void;
 }) {
+  // which session this drill was just added to, for the ✓ feedback
+  const [addedTo, setAddedTo] = useState<string | null>(null);
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 p-4">
       <div className="mx-auto flex max-w-lg flex-col gap-3 rounded-2xl bg-white p-5 shadow-xl">
@@ -50,14 +69,15 @@ export default function DrillViewer({
           </button>
         </header>
 
-        {drill.diagramSpec ? (
+        {board ? (
+          // a coach-drawn board overrides the library diagram
+          <AnimatedBoard board={board} className="mx-auto w-full max-w-xs" />
+        ) : drill.diagramSpec ? (
           <SpecDiagram
             spec={drill.diagramSpec}
             name={drill.name}
             className="mx-auto w-full max-w-xs rounded-lg bg-white p-1"
           />
-        ) : board ? (
-          <AnimatedBoard board={board} className="mx-auto w-full max-w-xs" />
         ) : (
           <p className="rounded-lg bg-stone-100 px-3 py-6 text-center text-sm text-stone-500">
             No diagram for this drill yet — add one on the Board tab and link
@@ -65,13 +85,14 @@ export default function DrillViewer({
           </p>
         )}
 
-        {(drill.players || drill.area || drill.level) && (
-          <p className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-stone-500">
-            {drill.players && <span>Players: {drill.players}</span>}
-            {drill.area && <span>Area: {drill.area}</span>}
-            {drill.level && <span>{LEVEL_LABEL[drill.level]}</span>}
-          </p>
-        )}
+        <p className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-stone-500">
+          {drill.players && <span>Players: {drill.players}</span>}
+          {drill.area && <span>Area: {drill.area}</span>}
+          <span>
+            <span aria-hidden>🔺</span> {coneSetup(drill)}
+          </span>
+          {drill.level && <span>{LEVEL_LABEL[drill.level]}</span>}
+        </p>
 
         {drill.description && (
           <p className="text-sm leading-relaxed text-stone-700">
@@ -115,6 +136,48 @@ export default function DrillViewer({
               drill.source
             )}
           </p>
+        )}
+
+        {onAddToSession && (
+          <section className="flex flex-col gap-1.5 rounded-xl border border-stone-200 bg-stone-50 p-3">
+            <h3 className="text-sm font-semibold">Add to a session</h3>
+            <div className="flex flex-wrap gap-1.5">
+              {sessions
+                .slice()
+                .sort((a, b) => b.date.localeCompare(a.date))
+                .slice(0, 4)
+                .map((s) => {
+                  const added = addedTo === s.id;
+                  const already = s.drillIds.includes(drill.id) && !added;
+                  return (
+                    <button
+                      key={s.id}
+                      onClick={() => setAddedTo(onAddToSession(s.id))}
+                      disabled={added || already}
+                      className={`min-h-[44px] rounded-full border px-3 text-sm font-medium ${
+                        added || already
+                          ? "border-pitch bg-emerald-50 text-pitch"
+                          : "border-stone-300 bg-white text-stone-600"
+                      }`}
+                    >
+                      {added ? "✓ Added · " : already ? "✓ In · " : ""}
+                      {formatDate(s.date)}
+                    </button>
+                  );
+                })}
+              <button
+                onClick={() => setAddedTo(onAddToSession(null))}
+                className="min-h-[44px] rounded-full border border-pitch px-3 text-sm font-semibold text-pitch"
+              >
+                ＋ New session
+              </button>
+            </div>
+            {addedTo && (
+              <p className="text-xs text-emerald-700">
+                Added — find it on the Sessions tab.
+              </p>
+            )}
+          </section>
         )}
 
         <button

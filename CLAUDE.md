@@ -51,8 +51,18 @@ Five bottom-nav tabs, components colocated by feature under `app/(tabs)/`:
    set (plus a "No unit set" group), falling back to one plain list before then.
    Not the app's landing page — the root (`app/page.tsx`) and PWA `start_url`
    open on **Sessions**, the weekly driver.
-2. **Drills** — one consistent library, seeded on first open, tag filter,
-   add/edit. The library is the imported **drill kit** (`lib/seedDrillsKit.ts`,
+2. **Drills** — one consistent library, seeded on first open; text search
+   (`search.ts`, shared with the session builder), tag filter, and a
+   **cone-set** filter (`lib/coneSetup.ts` derives a setup label from `area`,
+   overridable per drill via `setup`) so drills sharing a layout group
+   together. Tapping a card edits everything — description, cues, players,
+   area, cone set, and the diagram (raw spec with live preview, or link a
+   coach-drawn board, which takes precedence over `diagramSpec` at every
+   render site). Edits MERGE onto the stored drill so unseen fields (level,
+   source) survive. The drill viewer can add the drill straight into a
+   session (existing or new). The session builder groups its library by cone
+   set and marks back-to-back same-setup drills "same cones ✓" (also called
+   out in Present mode). The library is the imported **drill kit** (`lib/seedDrillsKit.ts`,
    110, ids `kit-*`) plus hand-drawn extras (`lib/seedDrillsExtra.ts`, ids
    `kx-*`: scrum, lineout, tap-and-go, and the coach's own — driving maul
    2v2, tackle-and-jackal 1v1, drop-and-pop in threes), all
