@@ -53,8 +53,9 @@ Five bottom-nav tabs, components colocated by feature under `app/(tabs)/`:
    open on **Sessions**, the weekly driver.
 2. **Drills** — one consistent library, seeded on first open, tag filter,
    add/edit. The library is the imported **drill kit** (`lib/seedDrillsKit.ts`,
-   110, ids `kit-*`) plus a few hand-drawn set-piece extras
-   (`lib/seedDrillsExtra.ts`, ids `kx-*`: scrum, lineout, tap-and-go), all
+   110, ids `kit-*`) plus hand-drawn extras (`lib/seedDrillsExtra.ts`, ids
+   `kx-*`: scrum, lineout, tap-and-go, and the coach's own — driving maul
+   2v2, tackle-and-jackal 1v1, drop-and-pop in threes), all
    carrying a `diagramSpec` string rendered as an animated SVG by
    `components/drills/DrillDiagram.tsx` (themed to brand via `SpecDiagram.tsx`),
    plus extra fields (cues, players, area, level, source). The original
