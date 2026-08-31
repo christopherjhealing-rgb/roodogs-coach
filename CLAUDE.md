@@ -51,11 +51,17 @@ Five bottom-nav tabs, components colocated by feature under `app/(tabs)/`:
    set (plus a "No unit set" group), falling back to one plain list before then.
    Not the app's landing page — the root (`app/page.tsx`) and PWA `start_url`
    open on **Sessions**, the weekly driver.
-2. **Drills** — library seeded with 25 U9 drills on first open, tag filter,
-   add/edit (`lib/seedDrills.ts`). Each seed drill links to a pre-drawn
-   setup diagram (`lib/seedBoards.ts`) shown on its card. `lib/ensureSeed.ts`
-   seeds drills + boards idempotently and links them by naming convention
-   (`seed-x` drill → `seed-board-x` board).
+2. **Drills** — library seeded on first open, tag filter, add/edit. Two seed
+   sources: the original starter drills (`lib/seedDrills.ts`, 45), each linked
+   to a pre-drawn board diagram (`lib/seedBoards.ts`, `seed-x` drill →
+   `seed-board-x` board); and the imported **drill library**
+   (`lib/seedDrillsKit.ts`, 110 — generated from a kit, ids `kit-*`) which
+   carry a `diagramSpec` string rendered as an animated SVG by
+   `components/drills/DrillDiagram.tsx` (themed to brand via
+   `SpecDiagram.tsx`), plus extra fields (cues, players, area, level, source).
+   `lib/ensureSeed.ts` seeds both sets idempotently (shared `seededDrillIds`
+   tracking, so deletions don't resurrect and upgrades add new drills).
+   Render sites branch on `diagramSpec` (spec diagram) vs `boardId` (board).
 3. **Sessions** — session builder picking drills to ~60 min with a running
    counter, reorder, duplicate past session. Roll call per session
    (`attendeeIds`) and a fullscreen Present mode that steps through the

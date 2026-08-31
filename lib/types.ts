@@ -30,6 +30,9 @@ export interface Player {
   active: boolean;
 }
 
+/** Which squads a library drill suits as written. */
+export type DrillLevel = "u9" | "mod" | "older";
+
 export interface Drill {
   id: string;
   name: string;
@@ -43,6 +46,20 @@ export interface Drill {
   easier?: string;
   /** How to stretch the kids who've got it. */
   harder?: string;
+  // --- library drills (lib/seedDrillsKit.ts) carry these extras ---
+  /** Animated diagram spec string, rendered by components/drills/DrillDiagram. */
+  diagramSpec?: string;
+  /** Coaching cues / key points. */
+  cues?: string;
+  /** Players needed, e.g. "5" or "Any". */
+  players?: string;
+  /** Playing area, e.g. "15m x 20m". */
+  area?: string;
+  /** How age-appropriate as written. */
+  level?: DrillLevel;
+  /** Where the drill came from. */
+  source?: string;
+  sourceUrl?: string;
 }
 
 export interface Session {

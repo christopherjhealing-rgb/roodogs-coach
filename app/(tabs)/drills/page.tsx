@@ -6,6 +6,7 @@ import { ensureSeedData } from "@/lib/ensureSeed";
 import { useDataVersion } from "@/components/SyncProvider";
 import type { Board, Drill, DrillTag } from "@/lib/types";
 import { BoardPreview } from "../board/BoardCanvas";
+import SpecDiagram from "@/components/drills/SpecDiagram";
 import DrillForm from "./DrillForm";
 import DrillViewer from "./DrillViewer";
 import { ALL_TAGS, TAG_BADGE_CLASSES, TAG_LABELS } from "./tags";
@@ -206,16 +207,25 @@ export default function DrillsPage() {
                   </span>
                 )}
               </button>
-              {board && (
+              {(board || drill.diagramSpec) && (
                 <button
                   onClick={() => setViewing(drill)}
                   className="relative block w-full border-t border-stone-100 bg-stone-50 p-3 active:bg-stone-100"
                   aria-label={`Watch ${drill.name}`}
                 >
-                  <BoardPreview
-                    board={board}
-                    className="mx-auto w-36 rounded-lg border border-stone-200"
-                  />
+                  {drill.diagramSpec ? (
+                    <SpecDiagram
+                      spec={drill.diagramSpec}
+                      name={drill.name}
+                      animate={false}
+                      className="mx-auto w-40 rounded-lg border border-stone-200 bg-white p-1"
+                    />
+                  ) : (
+                    <BoardPreview
+                      board={board!}
+                      className="mx-auto w-36 rounded-lg border border-stone-200"
+                    />
+                  )}
                   <span className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-pitch px-3 py-1 text-xs font-bold text-white shadow">
                     ▶ Watch
                   </span>

@@ -1,6 +1,11 @@
 import { SEED_BOARDS } from "./seedBoards";
 import { SEED_DRILLS } from "./seedDrills";
+import { SEED_KIT_DRILLS } from "./seedDrillsKit";
 import { storage } from "./storage";
+
+// The starter set plus the imported library. Kit drills carry a diagramSpec
+// instead of a linked board, so board backfill leaves them alone.
+const ALL_SEED_DRILLS = [...SEED_DRILLS, ...SEED_KIT_DRILLS];
 
 const boardIds = new Set(SEED_BOARDS.map((b) => b.id));
 
@@ -33,10 +38,10 @@ export function ensureSeedData(): void {
   const drills = storage.getDrills();
   const haveDrill = new Set(drills.map((d) => d.id));
   const seededDrills = new Set(storage.getSeededDrillIds());
-  const newDrills = SEED_DRILLS.filter(
+  const newDrills = ALL_SEED_DRILLS.filter(
     (d) => !haveDrill.has(d.id) && !seededDrills.has(d.id)
   ).map((d) => ({ ...d, boardId: d.boardId ?? boardFor(d.id) }));
-  storage.setSeededDrillIds(SEED_DRILLS.map((d) => d.id));
+  storage.setSeededDrillIds(ALL_SEED_DRILLS.map((d) => d.id));
 
   // Backfill boardId on existing seed drills that predate their diagrams.
   let next = [...drills, ...newDrills];

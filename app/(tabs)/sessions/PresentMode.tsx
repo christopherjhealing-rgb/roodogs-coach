@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Board, Drill } from "@/lib/types";
 import AnimatedBoard from "../board/AnimatedBoard";
+import SpecDiagram from "@/components/drills/SpecDiagram";
 import { TAG_BADGE_CLASSES, TAG_LABELS } from "../drills/tags";
 
 /** Fullscreen drill-by-drill walkthrough for running a session at training. */
@@ -62,14 +63,25 @@ export default function PresentMode({
             </span>
           ))}
         </div>
-        {board && (
+        {drill.diagramSpec ? (
+          <SpecDiagram
+            spec={drill.diagramSpec}
+            name={drill.name}
+            className="mx-auto w-full max-w-[280px] rounded-xl bg-white p-2"
+          />
+        ) : board ? (
           <AnimatedBoard
             board={board}
             className="mx-auto w-full max-w-[280px]"
           />
-        )}
+        ) : null}
         {drill.description && (
           <p className="text-lg leading-relaxed">{drill.description}</p>
+        )}
+        {drill.cues && (
+          <p className="text-sm text-emerald-100">
+            <span className="font-semibold">Cues:</span> {drill.cues}
+          </p>
         )}
         {drill.equipment && (
           <p className="text-sm text-emerald-200">Gear: {drill.equipment}</p>

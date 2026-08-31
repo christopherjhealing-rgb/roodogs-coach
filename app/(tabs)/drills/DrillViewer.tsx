@@ -2,7 +2,14 @@
 
 import type { Board, Drill } from "@/lib/types";
 import AnimatedBoard from "../board/AnimatedBoard";
+import SpecDiagram from "@/components/drills/SpecDiagram";
 import { TAG_BADGE_CLASSES, TAG_LABELS } from "./tags";
+
+const LEVEL_LABEL = {
+  u9: "U10 ready",
+  mod: "U10 with tweaks",
+  older: "Older juniors",
+} as const;
 
 /** Fullscreen look at one drill: big playable diagram plus the detail. */
 export default function DrillViewer({
@@ -43,7 +50,13 @@ export default function DrillViewer({
           </button>
         </header>
 
-        {board ? (
+        {drill.diagramSpec ? (
+          <SpecDiagram
+            spec={drill.diagramSpec}
+            name={drill.name}
+            className="mx-auto w-full max-w-xs rounded-lg bg-white p-1"
+          />
+        ) : board ? (
           <AnimatedBoard board={board} className="mx-auto w-full max-w-xs" />
         ) : (
           <p className="rounded-lg bg-stone-100 px-3 py-6 text-center text-sm text-stone-500">
@@ -52,9 +65,23 @@ export default function DrillViewer({
           </p>
         )}
 
+        {(drill.players || drill.area || drill.level) && (
+          <p className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-stone-500">
+            {drill.players && <span>Players: {drill.players}</span>}
+            {drill.area && <span>Area: {drill.area}</span>}
+            {drill.level && <span>{LEVEL_LABEL[drill.level]}</span>}
+          </p>
+        )}
+
         {drill.description && (
           <p className="text-sm leading-relaxed text-stone-700">
             {drill.description}
+          </p>
+        )}
+        {drill.cues && (
+          <p className="text-sm text-stone-700">
+            <span className="font-semibold text-pitch">Coaching cues:</span>{" "}
+            {drill.cues}
           </p>
         )}
         {drill.equipment && (
@@ -70,6 +97,23 @@ export default function DrillViewer({
           <p className="text-sm text-stone-700">
             <span className="font-semibold text-amber-700">Harder:</span>{" "}
             {drill.harder}
+          </p>
+        )}
+        {drill.source && (
+          <p className="text-xs text-stone-400">
+            Source:{" "}
+            {drill.sourceUrl ? (
+              <a
+                href={drill.sourceUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="underline"
+              >
+                {drill.source}
+              </a>
+            ) : (
+              drill.source
+            )}
           </p>
         )}
 
