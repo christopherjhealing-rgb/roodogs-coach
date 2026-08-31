@@ -13,16 +13,18 @@ import type {
 export const PITCH_W = 100;
 export const PITCH_H = 140;
 
+// Arrow palette, matched to the drill-library diagrams (dark ink runs, brass
+// passes, muted kicks, red contact) so both read as one design on a light board.
 export const MOVEMENT_STYLE: Record<
   MovementType,
   { color: string; dash?: string; label: string }
 > = {
-  run: { color: "#ffffff", label: "Run" },
-  pass: { color: "#fde047", dash: "3 2", label: "Pass" },
-  kick: { color: "#7dd3fc", dash: "1 2.2", label: "Kick" },
-  tackle: { color: "#fb7185", label: "Tackle" },
-  jump: { color: "#c4b5fd", dash: "3 2", label: "Jump" },
-  draw: { color: "#fdba74", label: "Pen" },
+  run: { color: "#12332A", label: "Run" },
+  pass: { color: "#D3571B", dash: "3 2", label: "Pass" },
+  kick: { color: "#5B6878", dash: "1.5 2.4", label: "Kick" },
+  tackle: { color: "#C8102E", label: "Tackle" },
+  jump: { color: "#7c3aed", dash: "3 2", label: "Jump" },
+  draw: { color: "#b45309", label: "Pen" },
 };
 
 export const TOKEN_LABELS: Record<TokenType, string> = {
@@ -82,14 +84,19 @@ function GridLines({ step }: { step: number }) {
   const lines = [];
   for (let x = step; x < PITCH_W; x += step)
     lines.push(
-      <line key={`v${x}`} x1={x} y1={0} x2={x} y2={PITCH_H} stroke="#fff" strokeWidth={0.25} opacity={0.18} />
+      <line key={`v${x}`} x1={x} y1={0} x2={x} y2={PITCH_H} stroke="#1E5B3C" strokeWidth={0.22} opacity={0.14} />
     );
   for (let y = step; y < PITCH_H; y += step)
     lines.push(
-      <line key={`h${y}`} x1={0} y1={y} x2={PITCH_W} y2={y} stroke="#fff" strokeWidth={0.25} opacity={0.18} />
+      <line key={`h${y}`} x1={0} y1={y} x2={PITCH_W} y2={y} stroke="#1E5B3C" strokeWidth={0.22} opacity={0.14} />
     );
   return <g>{lines}</g>;
 }
+
+// Light tactical-board palette, matched to the drill-library diagrams.
+const SURFACE_BG = "#f2f5ef";
+const BOARD_LINE = "#2F6B3A"; // try / boundary
+const BOARD_MUTED = "#5B6878";
 
 export function Pitch({
   variant = "pitch",
@@ -101,27 +108,29 @@ export function Pitch({
 }) {
   return (
     <g>
-      <rect x={0} y={0} width={PITCH_W} height={PITCH_H} fill="#2f7a44" />
+      {/* light tactical board with a dashed boundary, like the drill diagrams */}
+      <rect x={0} y={0} width={PITCH_W} height={PITCH_H} fill={SURFACE_BG} />
       <rect
         x={2}
         y={2}
         width={PITCH_W - 4}
         height={PITCH_H - 4}
         fill="none"
-        stroke="#ffffff"
+        stroke={BOARD_LINE}
         strokeWidth={0.5}
-        opacity={0.9}
+        strokeDasharray="2.5 2"
+        opacity={0.5}
       />
       {variant === "pitch" && (
         <>
           {/* try lines */}
-          <line x1={2} y1={14} x2={PITCH_W - 2} y2={14} stroke="#fff" strokeWidth={0.5} />
-          <line x1={2} y1={PITCH_H - 14} x2={PITCH_W - 2} y2={PITCH_H - 14} stroke="#fff" strokeWidth={0.5} />
+          <line x1={2} y1={14} x2={PITCH_W - 2} y2={14} stroke={BOARD_LINE} strokeWidth={0.9} />
+          <line x1={2} y1={PITCH_H - 14} x2={PITCH_W - 2} y2={PITCH_H - 14} stroke={BOARD_LINE} strokeWidth={0.9} />
           {/* halfway */}
-          <line x1={2} y1={PITCH_H / 2} x2={PITCH_W - 2} y2={PITCH_H / 2} stroke="#fff" strokeWidth={0.5} />
+          <line x1={2} y1={PITCH_H / 2} x2={PITCH_W - 2} y2={PITCH_H / 2} stroke={BOARD_MUTED} strokeWidth={0.4} opacity={0.5} />
           {/* dashed lines either side of halfway */}
-          <line x1={2} y1={42} x2={PITCH_W - 2} y2={42} stroke="#fff" strokeWidth={0.35} strokeDasharray="2 2" opacity={0.6} />
-          <line x1={2} y1={PITCH_H - 42} x2={PITCH_W - 2} y2={PITCH_H - 42} stroke="#fff" strokeWidth={0.35} strokeDasharray="2 2" opacity={0.6} />
+          <line x1={2} y1={42} x2={PITCH_W - 2} y2={42} stroke={BOARD_MUTED} strokeWidth={0.35} strokeDasharray="2 2" opacity={0.4} />
+          <line x1={2} y1={PITCH_H - 42} x2={PITCH_W - 2} y2={PITCH_H - 42} stroke={BOARD_MUTED} strokeWidth={0.35} strokeDasharray="2 2" opacity={0.4} />
         </>
       )}
       {grid > 0 && <GridLines step={grid} />}
@@ -132,16 +141,17 @@ export function Pitch({
 export function TokenGlyph({ token }: { token: BoardToken }) {
   switch (token.type) {
     case "player":
+      // seal-green disc with a white number — matches the drill attackers
       return (
         <g>
-          <circle r={3.4} fill="#ffffff" stroke="#14532d" strokeWidth={0.9} />
+          <circle r={3.4} fill="#1E5B3C" stroke="#12332A" strokeWidth={0.5} />
           {token.label && (
             <text
               textAnchor="middle"
               dy={1.2}
-              fontSize={3.4}
+              fontSize={3.3}
               fontWeight={700}
-              fill="#14532d"
+              fill="#ffffff"
             >
               {token.label}
             </text>
@@ -149,11 +159,9 @@ export function TokenGlyph({ token }: { token: BoardToken }) {
         </g>
       );
     case "opponent":
+      // red disc — matches the drill defenders
       return (
-        <g stroke="#ef4444" strokeWidth={1.2} strokeLinecap="round">
-          <line x1={-2.3} y1={-2.3} x2={2.3} y2={2.3} />
-          <line x1={-2.3} y1={2.3} x2={2.3} y2={-2.3} />
-        </g>
+        <circle r={3.2} fill="#C8102E" stroke="#8a0b20" strokeWidth={0.5} />
       );
     case "dad":
       // parent helper — bigger than the kids, friendly hat silhouette
@@ -177,10 +185,16 @@ export function TokenGlyph({ token }: { token: BoardToken }) {
         </g>
       );
     case "cone": {
-      // flat spot-marker: a small filled disc in its colour
+      // upright marker cone in its colour — matches the drill diagrams
       const fill = token.color ?? "#fb923c";
       return (
-        <circle r={2.3} fill={fill} stroke={coneStroke(fill)} strokeWidth={0.5} />
+        <path
+          d="M -2.4 2.3 L 2.4 2.3 L 0 -2.6 Z"
+          fill={fill}
+          stroke={coneStroke(fill)}
+          strokeWidth={0.4}
+          strokeLinejoin="round"
+        />
       );
     }
     case "hurdle":
@@ -244,8 +258,8 @@ export function TokenGlyph({ token }: { token: BoardToken }) {
     case "ball":
       return (
         <g transform="rotate(-30)">
-          <ellipse rx={2.7} ry={1.7} fill="#a16207" stroke="#713f12" strokeWidth={0.4} />
-          <line x1={-1.5} y1={0} x2={1.5} y2={0} stroke="#fef3c7" strokeWidth={0.35} />
+          <ellipse rx={2.7} ry={1.7} fill="#8B5A2B" stroke="#5c3c1c" strokeWidth={0.4} />
+          <line x1={-1.5} y1={0} x2={1.5} y2={0} stroke="#f5e6d0" strokeWidth={0.35} />
         </g>
       );
   }
@@ -389,7 +403,7 @@ export function MeasureGlyph({
   const px = Math.sin(rad);
   const py = -Math.cos(rad);
   const T = 1.9; // end-tick half length
-  const C = "#fbbf24";
+  const C = "#b45309"; // readable amber on the light board
   return (
     <g
       opacity={preview ? 0.6 : 1}
@@ -429,8 +443,8 @@ export function MeasureGlyph({
           fontSize={3.4}
           fontWeight={700}
           fill={C}
-          stroke="#1c1917"
-          strokeWidth={0.45}
+          stroke="#f2f5ef"
+          strokeWidth={0.7}
           paintOrder="stroke"
         >
           {formatMetres(len, widthM)}

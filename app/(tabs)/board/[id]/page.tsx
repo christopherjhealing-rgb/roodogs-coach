@@ -883,7 +883,7 @@ export default function BoardEditorPage() {
   );
 
   const movementIcon = (m: MovementType) => (
-    <svg viewBox="0 0 24 12" className="h-5 w-6 rounded bg-pitch-dark">
+    <svg viewBox="0 0 24 12" className="h-5 w-6 rounded bg-stone-100 ring-1 ring-stone-200">
       {m === "draw" ? (
         <path
           d="M3 8 Q7 2 11 7 T19 6"
@@ -1267,7 +1267,7 @@ export default function BoardEditorPage() {
     <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-stone-500">
       {MOVEMENT_TYPES.map((m) => (
         <span key={m} className="flex items-center gap-1.5">
-          <svg viewBox="0 0 24 8" className="h-2.5 w-7 rounded-sm bg-pitch-dark">
+          <svg viewBox="0 0 24 8" className="h-2.5 w-7 rounded-sm bg-stone-100 ring-1 ring-stone-200">
             <line
               x1={2}
               y1={4}
@@ -1426,9 +1426,9 @@ export default function BoardEditorPage() {
         y={Math.min(marquee.a.y, marquee.b.y)}
         width={Math.abs(marquee.b.x - marquee.a.x)}
         height={Math.abs(marquee.b.y - marquee.a.y)}
-        fill="#ffffff"
-        fillOpacity={0.12}
-        stroke="#ffffff"
+        fill="#1E5B3C"
+        fillOpacity={0.1}
+        stroke="#1E5B3C"
         strokeWidth={0.5}
         strokeDasharray="2 1.5"
         pointerEvents="none"
@@ -1477,9 +1477,9 @@ export default function BoardEditorPage() {
                 dy={-5}
                 fontSize={3.6}
                 fontWeight={700}
-                fill="#fbbf24"
-                stroke="#1c1917"
-                strokeWidth={0.45}
+                fill="#b45309"
+                stroke="#f2f5ef"
+                strokeWidth={0.7}
                 paintOrder="stroke"
               >
                 {formatMetres(lenU, widthM)}
@@ -1513,7 +1513,7 @@ export default function BoardEditorPage() {
               className="hover-ring"
               r={5.2}
               fill="none"
-              stroke="#fff"
+              stroke="#1E5B3C"
               strokeWidth={0.5}
               strokeDasharray="1.4 1"
               pointerEvents="none"

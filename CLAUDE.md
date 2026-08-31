@@ -51,17 +51,18 @@ Five bottom-nav tabs, components colocated by feature under `app/(tabs)/`:
    set (plus a "No unit set" group), falling back to one plain list before then.
    Not the app's landing page — the root (`app/page.tsx`) and PWA `start_url`
    open on **Sessions**, the weekly driver.
-2. **Drills** — library seeded on first open, tag filter, add/edit. Two seed
-   sources: the original starter drills (`lib/seedDrills.ts`, 45), each linked
-   to a pre-drawn board diagram (`lib/seedBoards.ts`, `seed-x` drill →
-   `seed-board-x` board); and the imported **drill library**
-   (`lib/seedDrillsKit.ts`, 110 — generated from a kit, ids `kit-*`) which
-   carry a `diagramSpec` string rendered as an animated SVG by
-   `components/drills/DrillDiagram.tsx` (themed to brand via
-   `SpecDiagram.tsx`), plus extra fields (cues, players, area, level, source).
-   `lib/ensureSeed.ts` seeds both sets idempotently (shared `seededDrillIds`
-   tracking, so deletions don't resurrect and upgrades add new drills).
-   Render sites branch on `diagramSpec` (spec diagram) vs `boardId` (board).
+2. **Drills** — one consistent library, seeded on first open, tag filter,
+   add/edit. The library is the imported **drill kit** (`lib/seedDrillsKit.ts`,
+   110, ids `kit-*`) plus a few hand-drawn set-piece extras
+   (`lib/seedDrillsExtra.ts`, ids `kx-*`: scrum, lineout, tap-and-go), all
+   carrying a `diagramSpec` string rendered as an animated SVG by
+   `components/drills/DrillDiagram.tsx` (themed to brand via `SpecDiagram.tsx`),
+   plus extra fields (cues, players, area, level, source). The original
+   board-diagram starter drills (ids `seed-*`) were **retired**;
+   `lib/ensureSeed.ts` cleans them out of storage and seeds the library
+   idempotently (shared `seededDrillIds` tracking). Render sites branch on
+   `diagramSpec` (spec diagram) vs `boardId` (board — still used by seed boards
+   on the Board tab).
 3. **Sessions** — session builder picking drills to ~60 min with a running
    counter, reorder, duplicate past session. Roll call per session
    (`attendeeIds`) and a fullscreen Present mode that steps through the
@@ -75,7 +76,11 @@ Five bottom-nav tabs, components colocated by feature under `app/(tabs)/`:
    Play animation). A drill can link one board via
    `boardId` and shows its thumbnail on the drill card.
    Coordinates are pitch units (0–100 × 0–140), rendering is shared between
-   the editor and list previews via `BoardCanvas.tsx`. Touch-first editor:
+   the editor and list previews via `BoardCanvas.tsx`. The whiteboard uses a
+   **light tactical-board aesthetic matched to the drill diagrams** (off-white
+   surface with a dashed green boundary, seal-green player discs with white
+   numbers, red defender discs, brass-orange triangle cones, dark-ink runs and
+   brass-orange passes — see `MOVEMENT_STYLE`, `TokenGlyph`, `Pitch`). Touch-first editor:
    tap-to-place, drag-to-move, drag-to-draw, erase, undo. Extras: ▶ Play
    animates tokens along their arrows (nearest token to an arrow's start
    gets paired with it), ⤴ shares the board as a PNG, cones have a colour
