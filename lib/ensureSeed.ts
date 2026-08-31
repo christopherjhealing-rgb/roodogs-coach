@@ -1,4 +1,3 @@
-import { SEED_BOARDS } from "./seedBoards";
 import { SEED_KIT_DRILLS } from "./seedDrillsKit";
 import { SEED_EXTRA_DRILLS } from "./seedDrillsExtra";
 import { storage } from "./storage";
@@ -6,25 +5,26 @@ import type { Drill } from "./types";
 
 // One consistent library: the imported kit plus a few hand-drawn set-piece
 // extras, all with animated diagram specs. The original board-diagram starter
-// drills (ids `seed-*`) have been retired and are cleaned out of storage below.
+// drills (ids `seed-*`) and their example boards (ids `seed-board-*`) have
+// been retired and are cleaned out of storage below. The Board tab now holds
+// only the coach's own boards (which have generated uuid ids, never the seed
+// prefix, so the cleanup can't touch them).
 const ALL_SEED_DRILLS: Drill[] = [...SEED_KIT_DRILLS, ...SEED_EXTRA_DRILLS];
 
 /**
- * Idempotently ensure the drill library and example boards are in storage,
- * adding any new since last run (without resurrecting ones the coach deleted).
- * The "which seeds have ever been added" sets live in storage so cloud sync
- * carries them between devices.
+ * Idempotently ensure the drill library is in storage, adding any new since
+ * last run (without resurrecting ones the coach deleted). The "which seeds
+ * have ever been added" sets live in storage so cloud sync carries them
+ * between devices.
  */
 export function ensureSeedData(): void {
-  // Example boards for the whiteboard.
-  const boards = storage.getBoards();
-  const haveBoard = new Set(boards.map((b) => b.id));
-  const seededBoards = new Set(storage.getSeededBoardIds());
-  const newBoards = SEED_BOARDS.filter(
-    (b) => !haveBoard.has(b.id) && !seededBoards.has(b.id)
+  // Retire the orphaned example boards left over from the old starter drills.
+  const storedBoards = storage.getBoards();
+  const keptBoards = storedBoards.filter(
+    (b) => !b.id.startsWith("seed-board-")
   );
-  if (newBoards.length) storage.setBoards([...boards, ...newBoards]);
-  storage.setSeededBoardIds(SEED_BOARDS.map((b) => b.id));
+  if (keptBoards.length !== storedBoards.length)
+    storage.setBoards(keptBoards);
 
   // Retire the old board-diagram starter drills wherever they still linger, so
   // the library is one consistent set in the new animated-diagram style.

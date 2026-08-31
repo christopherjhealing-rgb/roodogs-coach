@@ -58,11 +58,12 @@ Five bottom-nav tabs, components colocated by feature under `app/(tabs)/`:
    carrying a `diagramSpec` string rendered as an animated SVG by
    `components/drills/DrillDiagram.tsx` (themed to brand via `SpecDiagram.tsx`),
    plus extra fields (cues, players, area, level, source). The original
-   board-diagram starter drills (ids `seed-*`) were **retired**;
-   `lib/ensureSeed.ts` cleans them out of storage and seeds the library
-   idempotently (shared `seededDrillIds` tracking). Render sites branch on
-   `diagramSpec` (spec diagram) vs `boardId` (board — still used by seed boards
-   on the Board tab).
+   board-diagram starter drills (ids `seed-*`) and their example boards
+   (ids `seed-board-*`) were **retired**; `lib/ensureSeed.ts` cleans both out
+   of storage and seeds the library idempotently (shared `seededDrillIds`
+   tracking; it runs on the Drills, Sessions and Board tabs). Render sites
+   branch on `diagramSpec` (spec diagram) vs `boardId` (a coach-linked board).
+   The Board tab holds only the coach's own boards.
 3. **Sessions** — session builder picking drills to ~60 min with a running
    counter, reorder, duplicate past session. Roll call per session
    (`attendeeIds`) and a fullscreen Present mode that steps through the

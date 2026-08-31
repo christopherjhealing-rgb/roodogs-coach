@@ -45,7 +45,8 @@ export const CONE_COLORS: { fill: string; stroke: string; name: string }[] = [
   { fill: "#ef4444", stroke: "#b91c1c", name: "Red" },
   { fill: "#3b82f6", stroke: "#1d4ed8", name: "Blue" },
   { fill: "#22c55e", stroke: "#15803d", name: "Green" },
-  { fill: "#f5f5f4", stroke: "#a8a29e", name: "White" },
+  // black replaces white, which vanished on the light board
+  { fill: "#292524", stroke: "#0c0a09", name: "Black" },
 ];
 
 function coneStroke(fill: string): string {

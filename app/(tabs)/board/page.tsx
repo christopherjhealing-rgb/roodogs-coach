@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { newId, storage } from "@/lib/storage";
+import { ensureSeedData } from "@/lib/ensureSeed";
 import { useDataVersion } from "@/components/SyncProvider";
 import type { Board, BoardKind } from "@/lib/types";
 import { BoardPreview } from "./BoardCanvas";
@@ -33,6 +34,8 @@ export default function BoardListPage() {
   const dataVersion = useDataVersion();
 
   useEffect(() => {
+    // idempotent — also sweeps out the retired seed-board-* examples
+    ensureSeedData();
     setBoards(storage.getBoards());
     setLoaded(true);
   }, [dataVersion]);
