@@ -13,8 +13,8 @@ export const BARRE_DIAGRAMS: Record<string, MovementDiagram> = {
     scene: "barre",
     dur: 2.4,
     frames: [
-      { hip: [30, 35], torso: -90, armL: { upper: 165, lower: 200 }, armR: { upper: 60, lower: 110 }, leg: { upper: 90, lower: 90 } },
-      { hip: [30, 41], torso: -90, armL: { upper: 165, lower: 195 }, armR: { upper: 60, lower: 110 }, legL: { upper: 60, lower: 120 }, legR: { upper: 120, lower: 60 } },
+      { hip: [30, 35], torso: -90, armL: { upper: 145, lower: 155 }, armR: { upper: 60, lower: 110 }, leg: { upper: 90, lower: 90 } },
+      { hip: [30, 38], torso: -90, armL: { upper: 140, lower: 160 }, armR: { upper: 60, lower: 110 }, legL: { upper: 60, lower: 120 }, legR: { upper: 120, lower: 60 } },
     ],
   },
   // Relevé: rising onto the balls of the feet.
@@ -22,8 +22,8 @@ export const BARRE_DIAGRAMS: Record<string, MovementDiagram> = {
     scene: "barre",
     dur: 2,
     frames: [
-      { hip: [30, 35], torso: -90, armL: { upper: 165, lower: 200 }, armR: { upper: 90, lower: 90 }, leg: { upper: 90, lower: 90 } },
-      { hip: [30, 32], torso: -90, armL: { upper: 165, lower: 200 }, armR: { upper: 90, lower: 90 }, leg: { upper: 90, lower: 90 } },
+      { hip: [30, 35], torso: -90, armL: { upper: 145, lower: 155 }, armR: { upper: 90, lower: 90 }, leg: { upper: 90, lower: 90 } },
+      { hip: [30, 32], torso: -90, armL: { upper: 150, lower: 165 }, armR: { upper: 90, lower: 90 }, leg: { upper: 90, lower: 90 } },
     ],
   },
   // ---------------------------------------------------------------------------
@@ -37,7 +37,7 @@ export const BARRE_DIAGRAMS: Record<string, MovementDiagram> = {
     dur: 2.4,
     frames: [
       { hip: [30, 36], torso: -90, armL: { upper: 145, lower: 155 }, armR: { upper: 75, lower: 95 }, legL: { upper: 108, lower: 108 }, legR: { upper: 72, lower: 72 } },
-      { hip: [30, 40], torso: -90, armL: { upper: 145, lower: 152 }, armR: { upper: 75, lower: 95 }, legL: { upper: 135, lower: 92 }, legR: { upper: 45, lower: 88 } },
+      { hip: [30, 38.5], torso: -90, armL: { upper: 145, lower: 152 }, armR: { upper: 75, lower: 95 }, legL: { upper: 135, lower: 92 }, legR: { upper: 45, lower: 88 } },
     ],
   },
   // Tendu / dégagé: the working foot brushes forward along the floor, then
@@ -93,7 +93,7 @@ export const BARRE_DIAGRAMS: Record<string, MovementDiagram> = {
     dur: 1.4,
     frames: [
       { hip: [28, 35], torso: -90, arm: { upper: 145, lower: 152 }, leg: { upper: 90, lower: 90 } },
-      { hip: [34, 44], torso: -110, head: -95, arm: { upper: 170, lower: 185 }, leg: { upper: 165, lower: 80 } },
+      { hip: [37, 44], torso: -110, head: -95, arm: { upper: 175, lower: 180 }, leg: { upper: 165, lower: 80 } },
     ],
   },
   // Curtsy lunge: the outside leg crosses behind and both knees bend.
@@ -102,7 +102,7 @@ export const BARRE_DIAGRAMS: Record<string, MovementDiagram> = {
     dur: 1.6,
     frames: [
       { hip: [30, 35], torso: -90, armL: { upper: 145, lower: 155 }, armR: { upper: 75, lower: 95 }, leg: { upper: 90, lower: 90 } },
-      { hip: [32, 38], torso: -90, armL: { upper: 160, lower: 178 }, armR: { upper: 75, lower: 95 }, legL: { upper: 120, lower: 70 }, legR: { upper: 50, lower: 110 } },
+      { hip: [32, 38], torso: -95, armL: { upper: 155, lower: 160 }, armR: { upper: 75, lower: 95 }, legL: { upper: 120, lower: 70 }, legR: { upper: 50, lower: 110 } },
     ],
   },
   // Fold over: forearms on the barre, head heavy, one leg reaching back and
@@ -111,9 +111,9 @@ export const BARRE_DIAGRAMS: Record<string, MovementDiagram> = {
     scene: "barre",
     dur: 2.6,
     frames: [
-      { hip: [43, 35], torso: -160, head: 160, arm: { upper: 200, lower: 105 }, legL: { upper: 90, lower: 90 }, legR: { upper: 10, lower: 5 } },
-      { hip: [43, 35], torso: -160, head: 160, arm: { upper: 200, lower: 105 }, legL: { upper: 90, lower: 90 }, legR: { upper: -5, lower: -8 } },
-      { hip: [43, 35], torso: -160, head: 160, arm: { upper: 200, lower: 105 }, legL: { upper: 90, lower: 90 }, legR: { upper: 0, lower: -80 } },
+      { hip: [44, 35], torso: -160, head: 160, arm: { upper: 200, lower: 110 }, legL: { upper: 90, lower: 90 }, legR: { upper: 10, lower: 5 } },
+      { hip: [44, 35], torso: -160, head: 160, arm: { upper: 200, lower: 110 }, legL: { upper: 90, lower: 90 }, legR: { upper: -5, lower: -8 } },
+      { hip: [44, 35], torso: -160, head: 160, arm: { upper: 200, lower: 110 }, legL: { upper: 90, lower: 90 }, legR: { upper: 0, lower: -80 } },
     ],
   },
   // Standing glute pulses: band above the knees, standing knee soft, the
@@ -133,8 +133,8 @@ export const BARRE_DIAGRAMS: Record<string, MovementDiagram> = {
     scene: "floor",
     dur: 1.6,
     frames: [
-      { hip: [55, 54], torso: -82, arm: { upper: 85, lower: 95 }, legL: { upper: 175, lower: 200 }, legR: { upper: -10, lower: 150 } },
-      { hip: [55, 54], torso: -82, arm: { upper: 85, lower: 95 }, legL: { upper: 162, lower: 190 }, legR: { upper: -10, lower: 150 } },
+      { hip: [55, 54], torso: -82, arm: { upper: 60, lower: 100 }, legL: { upper: 177, lower: 175 }, legR: { upper: -10, lower: 150 } },
+      { hip: [55, 54], torso: -82, arm: { upper: 60, lower: 100 }, legL: { upper: 195, lower: 190 }, legR: { upper: -10, lower: 150 } },
     ],
   },
   // Attitude: the working leg lifts behind with the knee bent and turned out.
@@ -153,7 +153,7 @@ export const BARRE_DIAGRAMS: Record<string, MovementDiagram> = {
     dur: 1.8,
     frames: [
       { hip: [28, 35], torso: -95, arm: { upper: 145, lower: 152 }, legL: { upper: 90, lower: 90 }, legR: { upper: 10, lower: 5 } },
-      { hip: [28, 35], torso: -105, head: -95, arm: { upper: 150, lower: 158 }, legL: { upper: 90, lower: 90 }, legR: { upper: -10, lower: -12 } },
+      { hip: [28, 35], torso: -100, head: -90, arm: { upper: 111, lower: 171 }, legL: { upper: 90, lower: 90 }, legR: { upper: -10, lower: -12 } },
     ],
   },
   // Waterski: arms long on the barre, hinging back like a waterskier with the
@@ -162,8 +162,8 @@ export const BARRE_DIAGRAMS: Record<string, MovementDiagram> = {
     scene: "barre",
     dur: 1.4,
     frames: [
-      { hip: [19, 36], torso: -62, head: -75, arm: { upper: 160, lower: 160 }, leg: { upper: 105, lower: 78 } },
-      { hip: [17, 36], torso: -68, head: -80, arm: { upper: 165, lower: 165 }, leg: { upper: 110, lower: 72 } },
+      { hip: [21, 35.4], torso: -72, head: -80, arm: { upper: 148, lower: 148 }, leg: { upper: 98, lower: 82 } },
+      { hip: [19, 35.6], torso: -62, head: -75, arm: { upper: 155, lower: 155 }, leg: { upper: 105, lower: 78 } },
     ],
   },
   // Calf raises: facing the barre, rising onto the balls of the feet.
@@ -196,7 +196,7 @@ export const BARRE_DIAGRAMS: Record<string, MovementDiagram> = {
     props: { weights: true },
     dur: 1.8,
     frames: [
-      { hip: [50, 35], torso: -90, arm: { upper: 75, lower: 80 }, leg: { upper: 90, lower: 90 } },
+      { hip: [50, 35], torso: -90, arm: { upper: 70, lower: 78 }, leg: { upper: 90, lower: 90 } },
       { hip: [50, 35], torso: -90, arm: { upper: 75, lower: -60 }, leg: { upper: 90, lower: 90 } },
     ],
   },
@@ -244,8 +244,8 @@ export const BARRE_DIAGRAMS: Record<string, MovementDiagram> = {
     scene: "barre",
     dur: 1.6,
     frames: [
-      { hip: [24, 36], torso: -90, arm: { upper: 130, lower: 170 }, leg: { upper: 70, lower: 100 } },
-      { hip: [26, 36], torso: -98, head: -90, arm: { upper: 135, lower: 172 }, leg: { upper: 65, lower: 105 } },
+      { hip: [24, 36], torso: -90, arm: { upper: 107, lower: 177 }, leg: { upper: 70, lower: 100 } },
+      { hip: [26, 36], torso: -98, head: -90, arm: { upper: 103, lower: 179 }, leg: { upper: 65, lower: 105 } },
     ],
   },
   // Round-back series: leaning back into a ball behind the lower back in a
@@ -292,8 +292,8 @@ export const BARRE_DIAGRAMS: Record<string, MovementDiagram> = {
     scene: "barre",
     dur: 3.2,
     frames: [
-      { hip: [34, 35], torso: -100, arm: { upper: 140, lower: 150 }, legL: { upper: 90, lower: 90 }, legR: { upper: 158, lower: 160 } },
-      { hip: [34, 35], torso: -125, head: -115, arm: { upper: 120, lower: 110 }, legL: { upper: 90, lower: 90 }, legR: { upper: 158, lower: 160 } },
+      { hip: [34, 35], torso: -100, arm: { upper: 140, lower: 150 }, legL: { upper: 90, lower: 90 }, legR: { upper: 202, lower: 200 } },
+      { hip: [34, 35], torso: -125, head: -115, arm: { upper: 120, lower: 110 }, legL: { upper: 90, lower: 90 }, legR: { upper: 202, lower: 200 } },
     ],
   },
   // Hip flexor lunge: one hand on the barre, back knee down in a long lunge,

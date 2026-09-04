@@ -11,8 +11,8 @@ export const MAT_DIAGRAMS: Record<string, MovementDiagram> = {
     scene: "mat",
     dur: 1.2,
     frames: [
-      { hip: [58, 54], torso: 178, head: 150, arm: { upper: 10, lower: 0 }, leg: { upper: -30, lower: -30 } },
-      { hip: [58, 54], torso: 178, head: 150, arm: { upper: -6, lower: -10 }, leg: { upper: -30, lower: -30 } },
+      { hip: [58, 54], torso: -165, head: -140, arm: { upper: 18, lower: 8 }, leg: { upper: -30, lower: -30 } },
+      { hip: [58, 54], torso: -165, head: -140, arm: { upper: 4, lower: -8 }, leg: { upper: -30, lower: -30 } },
     ],
   },
   // Roll Up: from lying flat with arms overhead, peel up into a C-curve
@@ -55,7 +55,7 @@ export const MAT_DIAGRAMS: Record<string, MovementDiagram> = {
     dur: 2.4,
     frames: [
       { hip: [58, 54], torso: 180, head: 180, arm: { upper: -100, lower: 130 }, leg: { upper: -55, lower: 78 } },
-      { hip: [58, 54], torso: 165, head: -140, arm: { upper: -100, lower: 130 }, leg: { upper: -55, lower: 78 } },
+      { hip: [58, 54], torso: -165, head: -140, arm: { upper: -100, lower: 130 }, leg: { upper: -55, lower: 78 } },
     ],
   },
   // Toe Taps: tabletop legs, one foot lowers to tap the mat.
@@ -176,7 +176,7 @@ export const MAT_DIAGRAMS: Record<string, MovementDiagram> = {
     scene: "mat",
     dur: 2,
     frames: [
-      { hip: [58, 52], torso: -60, head: -10, arm: { upper: 40, lower: 120 }, leg: { upper: -35, lower: 55 } },
+      { hip: [58, 54], torso: -60, head: -10, arm: { upper: 40, lower: 120 }, leg: { upper: -35, lower: 50 } },
       { hip: [53.3, 43], torso: 150, head: -160, arm: { upper: -110, lower: -30 }, leg: { upper: 180, lower: -90 } },
     ],
   },
@@ -185,8 +185,8 @@ export const MAT_DIAGRAMS: Record<string, MovementDiagram> = {
     scene: "mat",
     dur: 1.6,
     frames: [
-      { hip: [58, 54], torso: 168, head: -145, arm: { upper: -10, lower: -28 }, legR: { upper: -120, lower: 0 }, legL: { upper: -25, lower: -25 } },
-      { hip: [58, 54], torso: 168, head: -145, arm: { upper: -10, lower: -28 }, legR: { upper: -25, lower: -25 }, legL: { upper: -120, lower: 0 } },
+      { hip: [58, 54], torso: -168, head: -140, arm: { upper: -10, lower: -28 }, legR: { upper: -120, lower: 0 }, legL: { upper: -25, lower: -25 } },
+      { hip: [58, 54], torso: -168, head: -140, arm: { upper: -10, lower: -28 }, legR: { upper: -25, lower: -25 }, legL: { upper: -120, lower: 0 } },
     ],
   },
   // Double Leg Stretch: hug both knees, then reach arms and legs long.
@@ -194,8 +194,8 @@ export const MAT_DIAGRAMS: Record<string, MovementDiagram> = {
     scene: "mat",
     dur: 2.4,
     frames: [
-      { hip: [58, 54], torso: 168, head: -145, arm: { upper: -10, lower: -28 }, leg: { upper: -120, lower: 0 } },
-      { hip: [58, 54], torso: 168, head: -145, arm: { upper: 160, lower: 160 }, leg: { upper: -30, lower: -30 } },
+      { hip: [58, 54], torso: -168, head: -140, arm: { upper: -10, lower: -28 }, leg: { upper: -120, lower: 0 } },
+      { hip: [58, 54], torso: -168, head: -140, arm: { upper: 160, lower: 160 }, leg: { upper: -30, lower: -30 } },
     ],
   },
   // Single Straight Leg Stretch: scissor the straight legs, hands behind
@@ -204,8 +204,8 @@ export const MAT_DIAGRAMS: Record<string, MovementDiagram> = {
     scene: "mat",
     dur: 1.6,
     frames: [
-      { hip: [58, 54], torso: 168, head: -145, arm: { upper: -40, lower: -40 }, legR: { upper: -105, lower: -105 }, legL: { upper: -15, lower: -15 } },
-      { hip: [58, 54], torso: 168, head: -145, arm: { upper: -40, lower: -40 }, legR: { upper: -15, lower: -15 }, legL: { upper: -105, lower: -105 } },
+      { hip: [58, 54], torso: -168, head: -140, arm: { upper: -40, lower: -40 }, legR: { upper: -105, lower: -105 }, legL: { upper: -15, lower: -15 } },
+      { hip: [58, 54], torso: -168, head: -140, arm: { upper: -40, lower: -40 }, legR: { upper: -15, lower: -15 }, legL: { upper: -105, lower: -105 } },
     ],
   },
   // Double Straight Leg Stretch: hands behind the head, legs lower and lift.
@@ -213,8 +213,8 @@ export const MAT_DIAGRAMS: Record<string, MovementDiagram> = {
     scene: "mat",
     dur: 2.4,
     frames: [
-      { hip: [58, 54], torso: 168, head: -145, arm: { upper: -100, lower: 130 }, leg: { upper: -85, lower: -85 } },
-      { hip: [58, 54], torso: 168, head: -145, arm: { upper: -100, lower: 130 }, leg: { upper: -35, lower: -35 } },
+      { hip: [58, 54], torso: -168, head: -140, arm: { upper: -100, lower: 130 }, leg: { upper: -85, lower: -85 } },
+      { hip: [58, 54], torso: -168, head: -140, arm: { upper: -100, lower: 130 }, leg: { upper: -35, lower: -35 } },
     ],
   },
   // Criss Cross: hands behind the head, one knee in as the other leg
@@ -223,8 +223,8 @@ export const MAT_DIAGRAMS: Record<string, MovementDiagram> = {
     scene: "mat",
     dur: 1.6,
     frames: [
-      { hip: [58, 54], torso: 165, head: -140, arm: { upper: -100, lower: 130 }, legL: { upper: -95, lower: 5 }, legR: { upper: -20, lower: -20 } },
-      { hip: [58, 54], torso: 165, head: -140, arm: { upper: -100, lower: 130 }, legL: { upper: -20, lower: -20 }, legR: { upper: -95, lower: 5 } },
+      { hip: [58, 54], torso: -165, head: -140, arm: { upper: -100, lower: 130 }, legL: { upper: -95, lower: 5 }, legR: { upper: -20, lower: -20 } },
+      { hip: [58, 54], torso: -165, head: -140, arm: { upper: -100, lower: 130 }, legL: { upper: -20, lower: -20 }, legR: { upper: -95, lower: 5 } },
     ],
   },
   // Spine Stretch Forward: sit tall, arms forward, round forward over the legs.
@@ -241,7 +241,7 @@ export const MAT_DIAGRAMS: Record<string, MovementDiagram> = {
     scene: "mat",
     dur: 2.2,
     frames: [
-      { hip: [58, 52], torso: -65, head: -40, arm: { upper: 60, lower: -36 }, leg: { upper: -35, lower: -35 } },
+      { hip: [58, 54], torso: -65, head: -40, arm: { upper: 60, lower: -36 }, leg: { upper: -35, lower: -35 } },
       { hip: [53.3, 43], torso: 150, head: 175, arm: { upper: -85, lower: 179 }, leg: { upper: 180, lower: 180 } },
     ],
   },
@@ -375,11 +375,11 @@ export const MAT_DIAGRAMS: Record<string, MovementDiagram> = {
   // Hip Circles: balance on the hands behind, legs together circle.
   "seed-mat-hip-circles": {
     scene: "mat",
-    dur: 2.2,
+    dur: 2.8,
     frames: [
-      { hip: [58, 52], torso: -125, head: -100, arm: { upper: 115, lower: 100 }, leg: { upper: -30, lower: -30 } },
-      { hip: [58, 52], torso: -125, head: -100, arm: { upper: 115, lower: 100 }, leg: { upper: -60, lower: -60 } },
-      { hip: [58, 52], torso: -125, head: -100, arm: { upper: 115, lower: 100 }, leg: { upper: -85, lower: -85 } },
+      { hip: [58, 52], torso: -100, head: -95, arm: { upper: 115, lower: 118 }, leg: { upper: -25, lower: -25 } },
+      { hip: [58, 52], torso: -100, head: -95, arm: { upper: 115, lower: 118 }, leg: { upper: -55, lower: -55 } },
+      { hip: [58, 52], torso: -100, head: -95, arm: { upper: 115, lower: 118 }, leg: { upper: -40, lower: -40 } },
     ],
   },
   // Swimming: prone, chest lifted, opposite arm and leg flutter.
@@ -445,7 +445,7 @@ export const MAT_DIAGRAMS: Record<string, MovementDiagram> = {
     scene: "mat",
     dur: 2,
     frames: [
-      { hip: [58, 52], torso: -60, head: -10, arm: { upper: 75, lower: 65 }, leg: { upper: -25, lower: 55 } },
+      { hip: [58, 54], torso: -60, head: -10, arm: { upper: 75, lower: 65 }, leg: { upper: -30, lower: 50 } },
       { hip: [53.3, 43], torso: 150, head: -160, arm: { upper: -75, lower: -85 }, leg: { upper: -170, lower: -90 } },
     ],
   },
@@ -454,7 +454,7 @@ export const MAT_DIAGRAMS: Record<string, MovementDiagram> = {
     scene: "mat",
     dur: 2.4,
     frames: [
-      { hip: [58, 52], torso: -60, head: -10, arm: { upper: 100, lower: 80 }, leg: { upper: -70, lower: 60 } },
+      { hip: [58, 54], torso: -60, head: -10, arm: { upper: 100, lower: 80 }, leg: { upper: -70, lower: 60 } },
       { hip: [50, 46], torso: 5, head: 100, arm: { upper: 160, lower: 140 }, leg: { upper: -20, lower: 110 } },
     ],
   },
