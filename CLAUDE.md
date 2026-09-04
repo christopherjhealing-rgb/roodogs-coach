@@ -169,3 +169,12 @@ instantly, and a background layer keeps a shared cloud copy in step.
 - `npm run dev` — local dev
 - `npm run build` — production build (must pass before commit)
 - `npm test` — game-time engine unit tests (must pass before commit)
+
+## Sibling app: Bloom Pilates (`pilates/`)
+
+`pilates/` is a **separate, standalone Next.js app** for Pilates instructors
+(Bloom Studios, Heathridge): movement library, timed lesson plans, teach mode
+and a class calendar. It shares nothing with the rugby app at the root except
+the stack and conventions. It has its own `package.json`, README, tests and
+Supabase-backed accounts (each instructor's data is private). Deploy it as
+its own Vercel project with Root Directory `pilates`. See `pilates/README.md`.
