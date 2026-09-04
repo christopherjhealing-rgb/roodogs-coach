@@ -46,9 +46,12 @@ create table if not exists public.movements (
   default_duration_sec integer,
   default_reps text,
   tags jsonb not null default '[]'::jsonb,
+  diagram_id text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+-- Existing installs: copies of seed movements keep the seed's diagram.
+alter table public.movements add column if not exists diagram_id text;
 
 create table if not exists public.lesson_plans (
   id uuid primary key default gen_random_uuid(),

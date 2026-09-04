@@ -143,6 +143,7 @@ type MovementRow = {
   default_duration_sec: number | null;
   default_reps: string | null;
   tags: string[];
+  diagram_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -193,6 +194,7 @@ function movementFromRow(r: MovementRow): Movement {
     defaultDurationSec: r.default_duration_sec ?? undefined,
     defaultReps: r.default_reps ?? undefined,
     tags: r.tags ?? [],
+    diagramId: r.diagram_id ?? undefined,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -215,6 +217,7 @@ function movementToRow(m: Movement, ownerId: string): Omit<MovementRow, "created
     default_duration_sec: m.defaultDurationSec ?? null,
     default_reps: m.defaultReps ?? null,
     tags: m.tags,
+    diagram_id: m.diagramId ?? null,
   };
 }
 

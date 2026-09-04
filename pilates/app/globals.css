@@ -69,3 +69,26 @@ body {
 .icon-btn {
   @apply inline-flex items-center justify-center rounded-full w-11 h-11 transition active:scale-95;
 }
+
+/* Movement diagrams (see lib/diagrams). Figure colour follows the surface. */
+.pose-wrap { --pd-ink: theme(colors.mint.DEFAULT); --pd-soft: rgba(185, 245, 199, 0.18); --pd-accent: #E8B07A; --pd-muted: rgba(185, 245, 199, 0.45); }
+.card .pose-wrap { --pd-ink: theme(colors.ink.DEFAULT); --pd-soft: theme(colors.mint.soft); --pd-accent: #C97A3A; --pd-muted: theme(colors.mint.dim); }
+.pose-wrap .pose-diagram { display: block; width: 100%; height: auto; }
+.pose-diagram .pd-body { stroke: var(--pd-ink); stroke-width: 2.6; stroke-linecap: round; fill: none; }
+.pose-diagram .pd-far { opacity: 0.42; }
+.pose-diagram .pd-head { fill: var(--pd-ink); }
+.pose-diagram .pd-mat { fill: var(--pd-soft); }
+.pose-diagram .pd-box { fill: var(--pd-soft); stroke: var(--pd-muted); stroke-width: 1; }
+.pose-diagram .pd-floor { stroke: var(--pd-muted); stroke-width: 1; stroke-linecap: round; }
+.pose-diagram .pd-prop { stroke: var(--pd-muted); stroke-width: 2; stroke-linecap: round; fill: none; }
+.pose-diagram .pd-prop-fill { fill: var(--pd-muted); }
+.pose-diagram .pd-ball { fill: var(--pd-accent); }
+.pose-diagram .pd-ring { fill: none; stroke: var(--pd-accent); stroke-width: 2; }
+.pose-diagram .pd-weight { fill: var(--pd-accent); }
+.pose-diagram .pd-band { stroke: var(--pd-accent); stroke-width: 1.6; stroke-linecap: round; stroke-dasharray: 2 1.5; fill: none; }
+.pose-diagram .pd-caption { font: 500 5px var(--font-display), system-ui, sans-serif; fill: var(--pd-muted); }
+@media (prefers-reduced-motion: reduce) { .pose-diagram animate { display: none; } }
+/* Thumbnail on list cards: a fixed-width figure beside the text. */
+.pose-thumb { width: 96px; flex-shrink: 0; border-radius: 12px; background: rgba(20, 41, 31, 0.05); overflow: hidden; }
+.pose-hero { border-radius: 16px; background: rgba(20, 41, 31, 0.05); overflow: hidden; }
+.card-dark .pose-hero, .teach-hero { background: rgba(23, 45, 35, 0.6); }

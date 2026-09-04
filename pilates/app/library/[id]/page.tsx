@@ -9,6 +9,7 @@ import { DisciplinePill, LevelPill } from "@/components/library/Pills";
 import { EQUIPMENT, FOCUS_AREAS, labelFor } from "@/lib/types";
 import { formatDuration, itemFromMovement } from "@/lib/plan";
 import { newId } from "@/lib/id";
+import PoseDiagram from "@/components/diagrams/PoseDiagram";
 
 export default function MovementPage() {
   const { id } = useParams<{ id: string }>();
@@ -34,7 +35,7 @@ export default function MovementPage() {
   async function duplicate() {
     if (!repo || !m) return;
     setBusy(true);
-    const copy = await repo.saveMovement({ ...m, id: newId(), ownerId: repo.userId, name: `${m.name} (my version)` });
+    const copy = await repo.saveMovement({ ...m, id: newId(), ownerId: repo.userId, name: `${m.name} (my version)`, diagramId: m.diagramId ?? m.id });
     bump();
     router.push(`/library/${copy.id}/edit`);
   }
@@ -90,6 +91,7 @@ export default function MovementPage() {
       </div>
 
       <div className="space-y-4">
+        <PoseDiagram movement={m} animate className="pose-hero" />
         <section className="card">
           <p className="whitespace-pre-line leading-relaxed">{m.description}</p>
           {m.springs && (

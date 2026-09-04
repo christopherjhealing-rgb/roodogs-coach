@@ -52,6 +52,14 @@ variables above. Framework preset: Next.js. That's it.
 - `lib/seedMovements.ts` – the shared, read-only movement library that ships
   with the app. Instructors can copy any movement into their own library to
   edit it, or add brand-new ones.
+- `lib/diagrams/` – every seed movement has an animated stick-figure
+  diagram. `types.ts` defines the pose language (hip position + absolute
+  limb angles, a scene such as mat / reformer / barre, optional props),
+  `mat.ts` / `reformer.ts` / `barre.ts` hold the poses, and `poseSvg.ts`
+  renders a diagram to SVG (static first frame on lists, SMIL-animated on
+  the movement page and in teach mode). Instructor copies keep their seed's
+  diagram via `diagramId`. `node scripts/preview-diagrams.mjs mat` renders
+  contact sheets to `.diagram-preview/` for checking poses by eye.
 - `lib/repo.ts` – storage interface with a Supabase implementation and a
   localStorage one; pages never touch either directly.
 - `lib/plan.ts`, `lib/dates.ts`, `lib/search.ts` – pure helpers, unit-tested

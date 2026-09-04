@@ -58,6 +58,8 @@ export interface Movement {
   /** Typical rep prescription, e.g. "8–10 each side". */
   defaultReps?: string;
   tags: string[];
+  /** Instructor copies keep the seed movement's diagram by pointing at its id. */
+  diagramId?: string;
   createdAt?: string;
   updatedAt?: string;
 }

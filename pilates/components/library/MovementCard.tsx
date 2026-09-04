@@ -3,6 +3,7 @@ import type { Movement } from "@/lib/types";
 import { FOCUS_AREAS, labelFor } from "@/lib/types";
 import { formatDuration } from "@/lib/plan";
 import { DisciplinePill, LevelPill } from "./Pills";
+import PoseDiagram from "@/components/diagrams/PoseDiagram";
 
 export default function MovementCard({
   movement: m,
@@ -15,12 +16,15 @@ export default function MovementCard({
 }) {
   const body = (
     <>
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h3 className="font-display font-semibold text-lg leading-tight truncate">{m.name}</h3>
+      <div className="flex items-start gap-3">
+        <PoseDiagram movement={m} className="pose-thumb" />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <h3 className="font-display font-semibold text-lg leading-tight truncate">{m.name}</h3>
+            <DisciplinePill discipline={m.discipline} />
+          </div>
           <p className="mt-1 text-sm text-ink/70 line-clamp-2">{m.description}</p>
         </div>
-        <DisciplinePill discipline={m.discipline} />
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink/70">
         <LevelPill level={m.level} onCard />

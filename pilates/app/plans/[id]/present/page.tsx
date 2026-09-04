@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRepoQuery } from "@/components/DataProvider";
 import { formatClock, planSeconds } from "@/lib/plan";
 import type { Movement } from "@/lib/types";
+import PoseDiagram from "@/components/diagrams/PoseDiagram";
 
 type Step = { sectionName: string; movement: Movement | undefined; durationSec: number; reps?: string; notes?: string };
 
@@ -100,6 +101,7 @@ export default function PresentPage() {
             <span className="text-sm mt-1 block opacity-80">{done ? "Time. Tap to restart" : running ? "Tap to pause" : "Tap to start"}</span>
           </button>
 
+          {step.movement && <PoseDiagram movement={step.movement} animate className="pose-hero teach-hero mb-6" />}
           {step.notes && <p className="card mb-4 font-medium">{step.notes}</p>}
 
           {step.movement && step.movement.cues.length > 0 && (
