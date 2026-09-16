@@ -81,13 +81,49 @@ export function surfaceFor(board: { kind: BoardKind }): Surface {
   return board.kind === "drill" ? "plain" : "pitch";
 }
 
-function GridLines({ step }: { step: number }) {
+export const DEFAULT_WIDTH_M = 40;
+/** Length:width of the original fixed board, kept as the default shape. */
+const DEFAULT_RATIO = PITCH_H / PITCH_W;
+
+type Sized = { widthM?: number; lengthM?: number; iconScale?: number };
+
+export function boardWidthM(b: Sized): number {
+  return b.widthM && b.widthM > 0 ? b.widthM : DEFAULT_WIDTH_M;
+}
+
+export function boardLengthM(b: Sized): number {
+  return b.lengthM && b.lengthM > 0
+    ? b.lengthM
+    : boardWidthM(b) * DEFAULT_RATIO;
+}
+
+/**
+ * Height of the drawing area in pitch units. The horizontal scale is fixed
+ * (PITCH_W units = widthM metres) so metres stay square in both directions;
+ * the length just makes the board taller or shorter. Defaults to PITCH_H.
+ *
+ * The bounds are pure defence against nonsense stored data — they sit well
+ * outside anything the size inputs allow, so a real shape (a 3 m × 20 m
+ * channel, say) is never squashed out of proportion.
+ */
+export function pitchHeight(b: Sized): number {
+  const h = (PITCH_W * boardLengthM(b)) / boardWidthM(b);
+  return Math.max(20, Math.min(2000, Math.round(h * 10) / 10));
+}
+
+/** Token size multiplier for a board (1 = standard). */
+export function iconScaleOf(b: Sized): number {
+  const s = b.iconScale;
+  return s && s > 0 ? Math.max(0.3, Math.min(2, s)) : 1;
+}
+
+function GridLines({ step, h }: { step: number; h: number }) {
   const lines = [];
   for (let x = step; x < PITCH_W; x += step)
     lines.push(
-      <line key={`v${x}`} x1={x} y1={0} x2={x} y2={PITCH_H} stroke="#1E5B3C" strokeWidth={0.22} opacity={0.14} />
+      <line key={`v${x}`} x1={x} y1={0} x2={x} y2={h} stroke="#1E5B3C" strokeWidth={0.22} opacity={0.14} />
     );
-  for (let y = step; y < PITCH_H; y += step)
+  for (let y = step; y < h; y += step)
     lines.push(
       <line key={`h${y}`} x1={0} y1={y} x2={PITCH_W} y2={y} stroke="#1E5B3C" strokeWidth={0.22} opacity={0.14} />
     );
@@ -102,44 +138,62 @@ const BOARD_MUTED = "#5B6878";
 export function Pitch({
   variant = "pitch",
   grid = 0,
+  h = PITCH_H,
 }: {
   variant?: Surface;
   /** Grid line spacing in pitch units; 0/undefined hides the grid. */
   grid?: number;
+  /** Board height in pitch units (see pitchHeight). */
+  h?: number;
 }) {
+  // full-pitch markings only make sense on a board long enough to hold them
+  const marked = variant === "pitch" && h >= 60;
   return (
     <g>
       {/* light tactical board with a dashed boundary, like the drill diagrams */}
-      <rect x={0} y={0} width={PITCH_W} height={PITCH_H} fill={SURFACE_BG} />
+      <rect x={0} y={0} width={PITCH_W} height={h} fill={SURFACE_BG} />
       <rect
         x={2}
         y={2}
         width={PITCH_W - 4}
-        height={PITCH_H - 4}
+        height={h - 4}
         fill="none"
         stroke={BOARD_LINE}
         strokeWidth={0.5}
         strokeDasharray="2.5 2"
         opacity={0.5}
       />
-      {variant === "pitch" && (
+      {marked && (
         <>
           {/* try lines */}
           <line x1={2} y1={14} x2={PITCH_W - 2} y2={14} stroke={BOARD_LINE} strokeWidth={0.9} />
-          <line x1={2} y1={PITCH_H - 14} x2={PITCH_W - 2} y2={PITCH_H - 14} stroke={BOARD_LINE} strokeWidth={0.9} />
+          <line x1={2} y1={h - 14} x2={PITCH_W - 2} y2={h - 14} stroke={BOARD_LINE} strokeWidth={0.9} />
           {/* halfway */}
-          <line x1={2} y1={PITCH_H / 2} x2={PITCH_W - 2} y2={PITCH_H / 2} stroke={BOARD_MUTED} strokeWidth={0.4} opacity={0.5} />
+          <line x1={2} y1={h / 2} x2={PITCH_W - 2} y2={h / 2} stroke={BOARD_MUTED} strokeWidth={0.4} opacity={0.5} />
           {/* dashed lines either side of halfway */}
           <line x1={2} y1={42} x2={PITCH_W - 2} y2={42} stroke={BOARD_MUTED} strokeWidth={0.35} strokeDasharray="2 2" opacity={0.4} />
-          <line x1={2} y1={PITCH_H - 42} x2={PITCH_W - 2} y2={PITCH_H - 42} stroke={BOARD_MUTED} strokeWidth={0.35} strokeDasharray="2 2" opacity={0.4} />
+          <line x1={2} y1={h - 42} x2={PITCH_W - 2} y2={h - 42} stroke={BOARD_MUTED} strokeWidth={0.35} strokeDasharray="2 2" opacity={0.4} />
         </>
       )}
-      {grid > 0 && <GridLines step={grid} />}
+      {grid > 0 && <GridLines step={grid} h={h} />}
     </g>
   );
 }
 
-export function TokenGlyph({ token }: { token: BoardToken }) {
+/** A board token, drawn at the origin. `scale` shrinks/grows the glyph
+ *  without moving it (see Board.iconScale). */
+export function TokenGlyph({
+  token,
+  scale = 1,
+}: {
+  token: BoardToken;
+  scale?: number;
+}) {
+  const shape = <TokenShape token={token} />;
+  return scale === 1 ? shape : <g transform={`scale(${scale})`}>{shape}</g>;
+}
+
+function TokenShape({ token }: { token: BoardToken }) {
   switch (token.type) {
     case "player":
       // seal-green disc with a white number — matches the drill attackers
@@ -465,21 +519,21 @@ export function BoardPreview({
 }) {
   return (
     <svg
-      viewBox={`0 0 ${PITCH_W} ${PITCH_H}`}
+      viewBox={`0 0 ${PITCH_W} ${pitchHeight(board)}`}
       className={className}
       role="img"
       aria-label={`Diagram: ${board.name}`}
     >
-      <Pitch variant={surfaceFor(board)} />
+      <Pitch variant={surfaceFor(board)} h={pitchHeight(board)} />
       {board.movements.map((m) => (
         <MovementGlyph key={m.id} movement={m} />
       ))}
       {(board.measures ?? []).map((ms) => (
-        <MeasureGlyph key={ms.id} measure={ms} widthM={board.widthM ?? 40} />
+        <MeasureGlyph key={ms.id} measure={ms} widthM={boardWidthM(board)} />
       ))}
       {board.tokens.map((t) => (
         <g key={t.id} transform={`translate(${t.x} ${t.y})`}>
-          <TokenGlyph token={t} />
+          <TokenGlyph token={t} scale={iconScaleOf(board)} />
         </g>
       ))}
     </svg>

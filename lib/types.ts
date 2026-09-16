@@ -172,6 +172,11 @@ export interface Board {
   measures?: BoardMeasure[];
   /** Real-world width of the drawn area in metres (defaults to 40). */
   widthM?: number;
+  /** Real-world length in metres. Defaults to 1.4 × widthM, which reproduces
+   *  the original fixed 100×140 board shape. */
+  lengthM?: number;
+  /** Size multiplier for the tokens on this board (1 = standard). */
+  iconScale?: number;
   updatedMs: number;
 }
 

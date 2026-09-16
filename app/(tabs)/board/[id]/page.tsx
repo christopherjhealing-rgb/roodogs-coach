@@ -18,13 +18,16 @@ import {
   MOVEMENT_STYLE,
   MeasureGlyph,
   MovementGlyph,
-  PITCH_H,
   PITCH_W,
   Pitch,
   TOKEN_LABELS,
   TokenGlyph,
+  boardLengthM,
+  boardWidthM,
   formatMetres,
+  iconScaleOf,
   pathLengthUnits,
+  pitchHeight,
   snapToGrid,
   surfaceFor,
 } from "../BoardCanvas";
@@ -79,6 +82,14 @@ const MOVEMENT_TYPES: MovementType[] = [
 const PLAYER_NUMBERS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 const GRID_STEPS_M = [1, 2, 5];
 
+/** Token size presets. 1 is the size the board has always drawn at. */
+const ICON_SIZES: { label: string; scale: number }[] = [
+  { label: "XS", scale: 0.55 },
+  { label: "S", scale: 0.75 },
+  { label: "M", scale: 1 },
+  { label: "L", scale: 1.3 },
+];
+
 interface Snapshot {
   tokens: BoardToken[];
   movements: BoardMovement[];
@@ -92,7 +103,7 @@ const OCT_Y = [0, 1, 1, 1, 0, -1, -1, -1];
 
 /** With grid lock on, arrows snap to the eight compass directions with
  *  endpoints on grid intersections (whole steps from the start). */
-function eightWaySnap(start: Pt, p: Pt, step: number): Pt {
+function eightWaySnap(start: Pt, p: Pt, step: number, h: number): Pt {
   const dx = p.x - start.x;
   const dy = p.y - start.y;
   const len = Math.hypot(dx, dy);
@@ -105,7 +116,7 @@ function eightWaySnap(start: Pt, p: Pt, step: number): Pt {
   const inBounds = (k: number) => {
     const x = start.x + ux * k * step;
     const y = start.y + uy * k * step;
-    return x >= 0 && x <= PITCH_W && y >= 0 && y <= PITCH_H;
+    return x >= 0 && x <= PITCH_W && y >= 0 && y <= h;
   };
   while (n > 1 && !inBounds(n)) n--;
   return { x: start.x + ux * n * step, y: start.y + uy * n * step };
@@ -130,6 +141,9 @@ export default function BoardEditorPage() {
   const [snap, setSnap] = useState(false);
   const [gridStepM, setGridStepM] = useState(2);
   const [widthStr, setWidthStr] = useState("40");
+  const [lengthStr, setLengthStr] = useState("56");
+  // the board size / icon size panel, opened from the "Size" button
+  const [showSettings, setShowSettings] = useState(false);
 
   // Landscape pitch when the window is wider than tall (desktop, rotated
   // phone/tablet); portrait pitch otherwise.
@@ -272,7 +286,10 @@ export default function BoardEditorPage() {
   useEffect(() => {
     const b = storage.getBoards().find((x) => x.id === boardId) ?? null;
     setBoard(b);
-    if (b) setWidthStr(String(b.widthM ?? 40));
+    if (b) {
+      setWidthStr(String(boardWidthM(b)));
+      setLengthStr(String(Math.round(boardLengthM(b))));
+    }
     setLoaded(true);
   }, [boardId]);
 
@@ -440,18 +457,24 @@ export default function BoardEditorPage() {
     // handlers close over current board/selection/undo state
   });
 
+  // Per-board geometry: the board is always PITCH_W units across, and as
+  // many units tall as its real-world length calls for.
+  const H = pitchHeight(board ?? {});
+  const widthM = boardWidthM(board ?? {});
+  const iconScale = iconScaleOf(board ?? {});
+
   // The SVG viewBox when fully zoomed out — pitch space in portrait, the
   // rotated space in landscape.
   const baseView: Rect = landscape
-    ? { x: 0, y: 0, w: PITCH_H, h: PITCH_W }
-    : { x: 0, y: 0, w: PITCH_W, h: PITCH_H };
+    ? { x: 0, y: 0, w: H, h: PITCH_W }
+    : { x: 0, y: 0, w: PITCH_W, h: H };
   const view = zoomView ?? baseView;
 
   // reset the zoom whenever the orientation flips (their view boxes differ)
   useEffect(() => {
     setZoomView(null);
     pinch.current = null;
-  }, [landscape]);
+  }, [landscape, H]);
 
   /** Screen position → pitch coordinates, honouring zoom and orientation. */
   function screenToPitch(clientX: number, clientY: number): Pt {
@@ -464,7 +487,7 @@ export default function BoardEditorPage() {
     const py = landscape ? sx : sy;
     return {
       x: Math.min(PITCH_W, Math.max(0, px)),
-      y: Math.min(PITCH_H, Math.max(0, py)),
+      y: Math.min(H, Math.max(0, py)),
     };
   }
 
@@ -530,7 +553,6 @@ export default function BoardEditorPage() {
     return used.length === 0 ? 1 : Math.max(...used) + 1;
   }
 
-  const widthM = board?.widthM ?? 40;
   // grid step in pitch units, from the chosen step in metres
   const stepU = (gridStepM / widthM) * PITCH_W;
   const snapStep = snap ? stepU : false;
@@ -667,7 +689,7 @@ export default function BoardEditorPage() {
         setPreview({
           id: "preview",
           type: mode.movement,
-          points: [pts[0], eightWaySnap(pts[0], p, stepU)],
+          points: [pts[0], eightWaySnap(pts[0], p, stepU, H)],
         });
       } else {
         const last = pts[pts.length - 1];
@@ -742,7 +764,7 @@ export default function BoardEditorPage() {
       const gridArrow = snap && mode.movement !== "draw";
       if (gridArrow) {
         // grid lock: straight, 8-way, grid-length arrow
-        const end = eightWaySnap(pts[0], p, stepU);
+        const end = eightWaySnap(pts[0], p, stepU, H);
         pts = [pts[0], end];
         if (Math.hypot(end.x - pts[0].x, end.y - pts[0].y) < 0.01) return;
       } else {
@@ -1057,9 +1079,43 @@ export default function BoardEditorPage() {
     </>
   );
 
+  // shortening a board never deletes anything — icons simply sit past the
+  // end until it's made longer again
+  const offBoard = board ? board.tokens.filter((t) => t.y > H).length : 0;
+
+  /** Board size is edited as a pair: whatever the inputs show is what gets
+   *  stored, so changing the width never silently re-derives the length. */
+  function persistSize(w: number, l: number) {
+    if (!board) return;
+    // 2 m is the narrowest real setup (the 2 m × 15 m drop-and-pop channel),
+    // so the floor has to sit below it
+    if (w < 2 || w > 200 || l < 2 || l > 300) return;
+    persist({ ...board, widthM: w, lengthM: l });
+  }
+
+  const sizeInput = (
+    value: string,
+    setValue: (v: string) => void,
+    label: string,
+    apply: (n: number) => void
+  ) => (
+    <input
+      inputMode="numeric"
+      value={value}
+      onChange={(e) => {
+        const v = e.target.value.replace(/\D/g, "").slice(0, 3);
+        setValue(v);
+        const num = parseInt(v, 10);
+        if (Number.isFinite(num)) apply(num);
+      }}
+      aria-label={label}
+      className="min-h-[36px] w-14 rounded-lg border border-stone-300 px-2 text-center text-sm outline-none focus:border-pitch"
+    />
+  );
+
   const boardSettings =
-    snap || mode.kind === "measure" ? (
-      <div className="flex flex-wrap items-center gap-1.5 text-xs">
+    showSettings || snap || mode.kind === "measure" ? (
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs">
         {snap && (
           <>
             <span className="font-medium text-stone-500">Grid:</span>
@@ -1079,20 +1135,38 @@ export default function BoardEditorPage() {
             ))}
           </>
         )}
-        <span className="pl-1 font-medium text-stone-500">Board width:</span>
-        <input
-          inputMode="numeric"
-          value={widthStr}
-          onChange={(e) => {
-            const s = e.target.value.replace(/\D/g, "").slice(0, 3);
-            setWidthStr(s);
-            const n = parseInt(s, 10);
-            if (n >= 5 && n <= 200) persist({ ...board, widthM: n });
-          }}
-          aria-label="Board width in metres"
-          className="min-h-[36px] w-14 rounded-lg border border-stone-300 px-2 text-center text-sm outline-none focus:border-pitch"
-        />
-        <span className="text-stone-500">m across</span>
+        <span className="font-medium text-stone-500">Board:</span>
+        {sizeInput(widthStr, setWidthStr, "Board width in metres", (num) =>
+          persistSize(num, parseInt(lengthStr, 10))
+        )}
+        <span className="text-stone-500">m wide ×</span>
+        {sizeInput(lengthStr, setLengthStr, "Board length in metres", (num) =>
+          persistSize(parseInt(widthStr, 10), num)
+        )}
+        <span className="text-stone-500">m long</span>
+        <span className="pl-1 font-medium text-stone-500">Icons:</span>
+        {ICON_SIZES.map((sz) => (
+          <button
+            key={sz.label}
+            onClick={() => board && persist({ ...board, iconScale: sz.scale })}
+            aria-pressed={iconScale === sz.scale}
+            aria-label={`${sz.label} icons`}
+            className={`min-h-[36px] rounded-full border px-2.5 font-semibold ${
+              iconScale === sz.scale
+                ? "border-pitch bg-pitch text-white"
+                : "border-stone-300 bg-white text-stone-600"
+            }`}
+          >
+            {sz.label}
+          </button>
+        ))}
+        {offBoard > 0 && (
+          <span className="basis-full font-medium text-amber-700">
+            {offBoard} {offBoard === 1 ? "icon sits" : "icons sit"} past the end
+            — lengthen the board to bring{" "}
+            {offBoard === 1 ? "it" : "them"} back. Nothing has been deleted.
+          </span>
+        )}
       </div>
     ) : null;
 
@@ -1293,7 +1367,7 @@ export default function BoardEditorPage() {
   const deleteButton = (bx: number, by: number) => (
     <g
       transform={`translate(${Math.min(PITCH_W - 4, Math.max(4, bx))} ${Math.min(
-        PITCH_H - 4,
+        H - 4,
         Math.max(4, by)
       )})`}
       onPointerDown={(e) => e.stopPropagation()}
@@ -1314,7 +1388,7 @@ export default function BoardEditorPage() {
     <circle
       cx={pos.x}
       cy={pos.y}
-      r={5.4}
+      r={Math.max(5.4, 5.4 * iconScale)}
       fill="none"
       stroke="#1e5b3c"
       strokeWidth={0.7}
@@ -1404,6 +1478,7 @@ export default function BoardEditorPage() {
               label,
               color: mode.token === "cone" ? coneColor : undefined,
             }}
+            scale={iconScale}
           />
         </g>
       );
@@ -1439,7 +1514,7 @@ export default function BoardEditorPage() {
 
   const boardContent = (
     <>
-      <Pitch variant={surfaceFor(board)} grid={snap ? stepU : 0} />
+      <Pitch variant={surfaceFor(board)} grid={snap ? stepU : 0} h={H} />
       {board.movements.map((m) => (
         <MovementGlyph
           key={m.id}
@@ -1466,7 +1541,7 @@ export default function BoardEditorPage() {
           if (lenU < 2) return null;
           const last = preview.points[preview.points.length - 1];
           const lx = Math.min(PITCH_W - 8, Math.max(8, last.x));
-          const ly = Math.min(PITCH_H - 4, Math.max(8, last.y));
+          const ly = Math.min(H - 4, Math.max(8, last.y));
           return (
             <g
               transform={`translate(${lx} ${ly}) rotate(${-screenDelta})`}
@@ -1505,13 +1580,14 @@ export default function BoardEditorPage() {
             transform={`translate(${pos.x} ${pos.y})`}
             onPointerDown={(e) => onTokenPointerDown(e, t)}
           >
-            {/* generous invisible hit area for cold thumbs */}
-            <circle r={6} fill="transparent" />
-            <TokenGlyph token={t} />
+            {/* generous invisible hit area for cold thumbs — never shrinks
+                below the standard size, however small the icons are drawn */}
+            <circle r={Math.max(6, 6 * iconScale)} fill="transparent" />
+            <TokenGlyph token={t} scale={iconScale} />
             {/* mouse-only hover ring (see globals.css) */}
             <circle
               className="hover-ring"
-              r={5.2}
+              r={Math.max(5.2, 5.2 * iconScale)}
               fill="none"
               stroke="#1E5B3C"
               strokeWidth={0.5}
@@ -1549,7 +1625,7 @@ export default function BoardEditorPage() {
       viewBox={viewBoxStr}
       className={`mx-auto touch-none select-none rounded-xl shadow-sm ${canvasCursor}`}
       style={{
-        aspectRatio: `${PITCH_H} / ${PITCH_W}`,
+        aspectRatio: `${H} / ${PITCH_W}`,
         height: "min(calc(100dvh - 150px), calc((100vw - 300px) * 0.714))",
       }}
       onPointerDown={onCanvasPointerDown}
@@ -1567,7 +1643,7 @@ export default function BoardEditorPage() {
       ref={svgRef}
       viewBox={viewBoxStr}
       className={`w-full touch-none select-none rounded-xl shadow-sm ${canvasCursor}`}
-      style={{ aspectRatio: `${PITCH_W} / ${PITCH_H}` }}
+      style={{ aspectRatio: `${PITCH_W} / ${H}` }}
       onPointerDown={onCanvasPointerDown}
       onPointerMove={onCanvasPointerMove}
       onPointerUp={onCanvasPointerUp}
@@ -1620,6 +1696,19 @@ export default function BoardEditorPage() {
           className="min-h-[44px] shrink-0 rounded-lg border border-stone-300 bg-white px-3 text-sm font-semibold text-stone-600"
         >
           ⤴
+        </button>
+        <button
+          onClick={() => setShowSettings((v) => !v)}
+          aria-pressed={showSettings}
+          aria-label="Board size"
+          title="Board size and icon size"
+          className={`min-h-[44px] shrink-0 rounded-lg border px-3 text-sm font-semibold ${
+            showSettings
+              ? "border-pitch bg-pitch text-white"
+              : "border-stone-300 bg-white text-stone-600"
+          }`}
+        >
+          ⇲ Size
         </button>
         <button
           onClick={() => setSnap((v) => !v)}

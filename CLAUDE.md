@@ -93,7 +93,8 @@ Five bottom-nav tabs, components colocated by feature under `app/(tabs)/`:
    `draw`: a plain line, no arrowhead, never grid-locked, and excluded from the
    Play animation). A drill can link one board via
    `boardId` and shows its thumbnail on the drill card.
-   Coordinates are pitch units (0–100 × 0–140), rendering is shared between
+   Coordinates are pitch units (0–100 across, 0–`pitchHeight` down —
+   140 on a default board), rendering is shared between
    the editor and list previews via `BoardCanvas.tsx`. The whiteboard uses a
    **light tactical-board aesthetic matched to the drill diagrams** (off-white
    surface with a dashed green boundary, seal-green player discs with white
@@ -109,9 +110,24 @@ Five bottom-nav tabs, components colocated by feature under `app/(tabs)/`:
    Move, Distance and Erase stay as direct buttons. **Two-finger pinch** zooms
    and pans the pitch (implemented by driving the SVG `viewBox`, so pointer↔pitch
    maths stays exact at any zoom; a "Reset zoom" button appears when zoomed).
-   Boards carry a real-world width (`widthM`, default 40 m); the Distance
-   tool draws dimension lines labelled in metres, and grid lock snaps at a
-   selectable 1/2/5 m step derived from that width. In Move mode a drag
+   A **Size** button opens a panel holding the board's real-world
+   dimensions and its icon size. Boards carry a width and a length in metres
+   (`widthM` default 40, `lengthM` default 1.4 × width — which reproduces the
+   original fixed 100×140 shape, so existing boards are untouched). The board
+   is always `PITCH_W` units across and `pitchHeight(board)` units tall, so a
+   metre is the same size in both directions and a 10 m square draws square —
+   that makes a 3 m × 20 m channel possible. Width and length are edited as a
+   pair: whatever the two inputs show is what gets stored, so changing one
+   never silently re-derives the other. **Shortening a board never deletes
+   anything** — icons past the new end just aren't drawn, and the panel says
+   how many and that nothing was lost. `iconScale` (XS/S/M/L chips) shrinks or
+   grows every token on the board without moving it; tap targets never shrink
+   below the standard size. All three live on `Board` and are applied at every
+   render site (editor, `BoardPreview`, `AnimatedBoard`) via the helpers in
+   `BoardCanvas.tsx` — `boardWidthM` / `boardLengthM` / `pitchHeight` /
+   `iconScaleOf`, unit-tested in `app/(tabs)/board/boardSize.test.ts`.
+   The Distance tool draws dimension lines labelled in metres, and grid lock
+   snaps at a selectable 1/2/5 m step derived from the width. In Move mode a drag
    over empty pitch marquee-selects several tokens (drag any one to move
    the group). Keyboard: Delete removes the selection, Ctrl/Cmd+Z undoes,
    Escape deselects. Hovering with a mouse shows a ghost of the tool

@@ -5,10 +5,12 @@ import type { Board } from "@/lib/types";
 import {
   MeasureGlyph,
   MovementGlyph,
-  PITCH_H,
   PITCH_W,
   Pitch,
   TokenGlyph,
+  boardWidthM,
+  iconScaleOf,
+  pitchHeight,
   surfaceFor,
 } from "./BoardCanvas";
 import { canPlay as boardCanPlay, runSequentialPlay } from "./boardPlay";
@@ -43,27 +45,29 @@ export default function AnimatedBoard({
   }
 
   const canPlay = boardCanPlay(board);
+  const h = pitchHeight(board);
+  const iconScale = iconScaleOf(board);
 
   return (
     <div className={`relative ${className}`}>
       <svg
-        viewBox={`0 0 ${PITCH_W} ${PITCH_H}`}
+        viewBox={`0 0 ${PITCH_W} ${h}`}
         className="w-full rounded-xl"
         role="img"
         aria-label={`Diagram: ${board.name}`}
       >
-        <Pitch variant={surfaceFor(board)} />
+        <Pitch variant={surfaceFor(board)} h={h} />
         {board.movements.map((m) => (
           <MovementGlyph key={m.id} movement={m} />
         ))}
         {(board.measures ?? []).map((ms) => (
-          <MeasureGlyph key={ms.id} measure={ms} widthM={board.widthM ?? 40} />
+          <MeasureGlyph key={ms.id} measure={ms} widthM={boardWidthM(board)} />
         ))}
         {board.tokens.map((t) => {
           const pos = anim?.get(t.id) ?? t;
           return (
             <g key={t.id} transform={`translate(${pos.x} ${pos.y})`}>
-              <TokenGlyph token={t} />
+              <TokenGlyph token={t} scale={iconScale} />
             </g>
           );
         })}
