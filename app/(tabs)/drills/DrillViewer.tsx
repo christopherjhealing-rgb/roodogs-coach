@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { Board, Drill, Session } from "@/lib/types";
 import AnimatedBoard from "../board/AnimatedBoard";
 import SpecDiagram from "@/components/drills/SpecDiagram";
+import GridMultiplier from "@/components/drills/GridMultiplier";
 import { coneSetup } from "@/lib/coneSetup";
 import { TAG_BADGE_CLASSES, TAG_LABELS } from "./tags";
 
@@ -28,12 +29,15 @@ export default function DrillViewer({
   drill,
   board,
   sessions = [],
+  squadSize = 0,
   onAddToSession,
   onClose,
 }: {
   drill: Drill;
   board?: Board;
   sessions?: Session[];
+  /** Active roster size, for working out how many grids to set up. */
+  squadSize?: number;
   /** Add this drill to a session (null = start a new one); returns its id. */
   onAddToSession?: (sessionId: string | null) => string;
   onClose: () => void;
@@ -93,6 +97,25 @@ export default function DrillViewer({
           </span>
           {drill.level && <span>{LEVEL_LABEL[drill.level]}</span>}
         </p>
+
+        {squadSize > 0 && (board || drill.diagramSpec) && (
+          <GridMultiplier
+            drill={drill}
+            squadSize={squadSize}
+            renderTile={() =>
+              board ? (
+                <AnimatedBoard board={board} className="w-full" />
+              ) : (
+                <SpecDiagram
+                  spec={drill.diagramSpec!}
+                  name={drill.name}
+                  animate={false}
+                  className="w-full"
+                />
+              )
+            }
+          />
+        )}
 
         {drill.description && (
           <p className="text-sm leading-relaxed text-stone-700">

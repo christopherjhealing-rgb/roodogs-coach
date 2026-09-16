@@ -279,6 +279,10 @@ export default function SessionsPage() {
             <PresentMode
               drills={sessionDrills}
               boards={new Map(boards.map((b) => [b.id, b]))}
+              // who's actually here tonight if the roll was taken, else the roster
+              squadSize={
+                (session.attendeeIds ?? []).length || players.length
+              }
               onClose={() => setPresentingId(null)}
             />
           );

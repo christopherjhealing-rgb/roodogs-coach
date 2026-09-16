@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Board, Drill } from "@/lib/types";
 import AnimatedBoard from "../board/AnimatedBoard";
 import SpecDiagram from "@/components/drills/SpecDiagram";
+import GridMultiplier from "@/components/drills/GridMultiplier";
 import { coneSetup } from "@/lib/coneSetup";
 import { TAG_BADGE_CLASSES, TAG_LABELS } from "../drills/tags";
 
@@ -11,10 +12,13 @@ import { TAG_BADGE_CLASSES, TAG_LABELS } from "../drills/tags";
 export default function PresentMode({
   drills,
   boards,
+  squadSize = 0,
   onClose,
 }: {
   drills: Drill[];
   boards: Map<string, Board>;
+  /** Players at training tonight, for the grid multiplier. */
+  squadSize?: number;
   onClose: () => void;
 }) {
   const [index, setIndex] = useState(0);
@@ -85,6 +89,25 @@ export default function PresentMode({
             className="mx-auto w-full max-w-[280px] rounded-xl bg-white p-2"
           />
         ) : null}
+        {squadSize > 0 && (board || drill.diagramSpec) && (
+          <GridMultiplier
+            drill={drill}
+            squadSize={squadSize}
+            dark
+            renderTile={() =>
+              board ? (
+                <AnimatedBoard board={board} className="w-full" />
+              ) : (
+                <SpecDiagram
+                  spec={drill.diagramSpec!}
+                  name={drill.name}
+                  animate={false}
+                  className="w-full"
+                />
+              )
+            }
+          />
+        )}
         {drill.description && (
           <p className="text-lg leading-relaxed">{drill.description}</p>
         )}

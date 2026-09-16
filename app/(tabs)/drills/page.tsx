@@ -5,7 +5,7 @@ import { newId, storage } from "@/lib/storage";
 import { ensureSeedData } from "@/lib/ensureSeed";
 import { coneSetup } from "@/lib/coneSetup";
 import { useDataVersion } from "@/components/SyncProvider";
-import type { Board, Drill, DrillTag, Session } from "@/lib/types";
+import type { Board, Drill, DrillTag, Player, Session } from "@/lib/types";
 import { BoardPreview } from "../board/BoardCanvas";
 import SpecDiagram from "@/components/drills/SpecDiagram";
 import DrillForm from "./DrillForm";
@@ -17,6 +17,7 @@ export default function DrillsPage() {
   const [drills, setDrills] = useState<Drill[]>([]);
   const [boards, setBoards] = useState<Board[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [squadSize, setSquadSize] = useState(0);
   const [loaded, setLoaded] = useState(false);
   const [filter, setFilter] = useState<DrillTag | "all">("all");
   const [query, setQuery] = useState("");
@@ -34,6 +35,7 @@ export default function DrillsPage() {
     setDrills(storage.getDrills());
     setBoards(storage.getBoards());
     setSessions(storage.getSessions());
+    setSquadSize(storage.getPlayers().filter((p: Player) => p.active).length);
     setLoaded(true);
   }, [dataVersion]);
 
@@ -315,6 +317,7 @@ export default function DrillsPage() {
               : undefined
           }
           sessions={sessions}
+          squadSize={squadSize}
           onAddToSession={(sessionId) => addToSession(sessionId, viewing)}
           onClose={() => setViewing(null)}
         />

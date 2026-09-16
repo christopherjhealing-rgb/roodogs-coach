@@ -62,7 +62,13 @@ Five bottom-nav tabs, components colocated by feature under `app/(tabs)/`:
    source) survive. The drill viewer can add the drill straight into a
    session (existing or new). The session builder groups its library by cone
    set and marks back-to-back same-setup drills "same cones ✓" (also called
-   out in Present mode). The library is the imported **drill kit** (`lib/seedDrillsKit.ts`,
+   out in Present mode). **Grid multiplier** (`lib/gridPlan.ts`, unit-tested):
+   parses a drill's free-text `players` into a per-grid capacity, divides the
+   squad by it and tiles that many copies of the diagram side by side, with a
+   cone total — so a 12-kid squad runs 4 grids of a 3-player drill instead of
+   queuing. Whole-squad activities ("Any", "Whole group", "two teams") never
+   multiply. Shown in the drill viewer and in Present mode (where it counts
+   the night's roll call if one was taken). The library is the imported **drill kit** (`lib/seedDrillsKit.ts`,
    110, ids `kit-*`) plus hand-drawn extras (`lib/seedDrillsExtra.ts`, ids
    `kx-*`: scrum, lineout, tap-and-go, and the coach's own — driving maul
    2v2, tackle-and-jackal 1v1, drop-and-pop in threes), all
