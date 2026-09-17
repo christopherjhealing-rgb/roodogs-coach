@@ -27,6 +27,8 @@ export default function SessionBuilder({
   const [drillIds, setDrillIds] = useState<string[]>(initial?.drillIds ?? []);
   const [notes, setNotes] = useState(initial?.notes ?? "");
   const [query, setQuery] = useState("");
+  // drill currently being dragged up or down the plan
+  const [dragId, setDragId] = useState<string | null>(null);
 
   const byId = new Map(drills.map((d) => [d.id, d]));
   const chosen = drillIds
@@ -59,6 +61,33 @@ export default function SessionBuilder({
     setDrillIds(next);
   }
 
+  /** Reorder by drag: drop the dragged drill into the slot of the row
+   *  under the finger. Same handle pattern as the Team tab's roster. */
+  function moveTo(fromId: string, overId: string) {
+    if (fromId === overId) return;
+    const ids = drillIds.filter((id) => id !== fromId);
+    const at = ids.indexOf(overId);
+    if (at < 0) return;
+    ids.splice(at, 0, fromId);
+    setDrillIds(ids);
+  }
+
+  function onHandlePointerDown(e: React.PointerEvent, id: string) {
+    e.preventDefault();
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    setDragId(id);
+  }
+
+  function onHandlePointerMove(e: React.PointerEvent) {
+    if (!dragId) return;
+    const row = document
+      .elementsFromPoint(e.clientX, e.clientY)
+      .map((el) => (el as HTMLElement).closest?.("[data-did]"))
+      .find(Boolean) as HTMLElement | undefined;
+    const overId = row?.dataset.did;
+    if (overId && overId !== dragId) moveTo(dragId, overId);
+  }
+
   return (
     <form
       onSubmit={(e) => {
@@ -88,7 +117,14 @@ export default function SessionBuilder({
       </div>
 
       <section className="flex flex-col gap-1.5">
-        <h3 className="text-sm font-medium">Session plan</h3>
+        <h3 className="text-sm font-medium">
+          Session plan
+          {chosen.length > 1 && (
+            <span className="pl-2 font-normal text-stone-400">
+              drag ⠿ to reorder
+            </span>
+          )}
+        </h3>
         {chosen.length === 0 && (
           <p className="rounded-lg border border-dashed border-stone-300 px-3 py-4 text-center text-sm text-stone-500">
             Nothing picked yet — tap drills below to build the session.
@@ -98,8 +134,34 @@ export default function SessionBuilder({
           {chosen.map((drill, i) => (
             <li
               key={drill.id}
-              className="flex items-center gap-2 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2"
+              data-did={drill.id}
+              className={`flex items-center gap-2 rounded-lg border bg-stone-50 py-2 pr-3 transition-opacity ${
+                dragId === drill.id
+                  ? "border-pitch opacity-60"
+                  : "border-stone-200"
+              }`}
             >
+              <button
+                type="button"
+                onPointerDown={(e) => onHandlePointerDown(e, drill.id)}
+                onPointerMove={onHandlePointerMove}
+                onPointerUp={() => setDragId(null)}
+                onPointerCancel={() => setDragId(null)}
+                onKeyDown={(e) => {
+                  // drag needs a pointer, so keep the keyboard route open
+                  if (e.key === "ArrowUp") {
+                    e.preventDefault();
+                    move(i, -1);
+                  } else if (e.key === "ArrowDown") {
+                    e.preventDefault();
+                    move(i, 1);
+                  }
+                }}
+                aria-label={`Reorder ${drill.name} — drag, or use the arrow keys`}
+                className="-my-2 flex w-9 shrink-0 cursor-grab touch-none items-center justify-center self-stretch rounded-l-lg border-r border-stone-200 text-stone-300 hover:text-pitch active:cursor-grabbing"
+              >
+                ⠿
+              </button>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-semibold">
                   {i + 1}. {drill.name}
@@ -115,24 +177,6 @@ export default function SessionBuilder({
                     )}
                 </span>
               </span>
-              <button
-                type="button"
-                onClick={() => move(i, -1)}
-                disabled={i === 0}
-                aria-label={`Move ${drill.name} earlier`}
-                className="min-h-[44px] min-w-[44px] rounded-lg text-stone-500 disabled:opacity-30"
-              >
-                ↑
-              </button>
-              <button
-                type="button"
-                onClick={() => move(i, 1)}
-                disabled={i === chosen.length - 1}
-                aria-label={`Move ${drill.name} later`}
-                className="min-h-[44px] min-w-[44px] rounded-lg text-stone-500 disabled:opacity-30"
-              >
-                ↓
-              </button>
               <button
                 type="button"
                 onClick={() =>

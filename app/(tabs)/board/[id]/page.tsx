@@ -32,6 +32,17 @@ import {
   surfaceFor,
 } from "../BoardCanvas";
 import { canPlay, runSequentialPlay } from "../boardPlay";
+import {
+  type ArrowEnd,
+  distanceToPath,
+  resizePath,
+} from "@/lib/boardGeometry";
+
+/** How close a tap has to land to an arrow, in pitch units, to count as
+ *  "on" it while a drawing tool is active. The arrow's hit band is much
+ *  fatter than this so it's easy to grab in Move mode; in Draw mode we want
+ *  a near miss to start a new arrow rather than grab the old one. */
+const DRAW_MODE_GRAB_UNITS = 2.5;
 
 type Mode =
   | { kind: "move" }
@@ -164,6 +175,14 @@ export default function BoardEditorPage() {
     measureOrigins: Map<string, { a: Pt; b: Pt }>;
   } | null>(null);
   const dragUndoTaken = useRef(false);
+  // dragging one end of a selected arrow to resize it
+  const resize = useRef<{
+    id: string;
+    end: ArrowEnd;
+    /** the arrow's points as they were when the drag began, so repeated
+     *  moves transform from the original rather than compounding */
+    from: Pt[];
+  } | null>(null);
   // sampled finger path while drawing an arrow — empty means not drawing
   const drawPoints = useRef<Pt[]>([]);
   const [preview, setPreview] = useState<BoardMovement | null>(null);
@@ -628,6 +647,30 @@ export default function BoardEditorPage() {
     if (e.pointerType === "mouse" && mode.kind === "place" && !drag.current) {
       setHoverPos(p);
     }
+    if (resize.current) {
+      if (!dragUndoTaken.current) {
+        pushUndo();
+        dragUndoTaken.current = true;
+      }
+      const r = resize.current;
+      const anchor =
+        r.end === "start" ? r.from[r.from.length - 1] : r.from[0];
+      // with grid lock on, a resized arrow snaps to the same eight compass
+      // directions it would have been drawn along
+      const target =
+        snap && board.movements.find((m) => m.id === r.id)?.type !== "draw"
+          ? eightWaySnap(anchor, p, stepU, H)
+          : p;
+      persist({
+        ...board,
+        movements: board.movements.map((m) =>
+          m.id === r.id
+            ? { ...m, points: resizePath(r.from, r.end, target) }
+            : m
+        ),
+      });
+      return;
+    }
     if (drag.current) {
       // snapshot once, on the first actual move, so a plain tap-to-select
       // doesn't add an empty undo step
@@ -709,6 +752,10 @@ export default function BoardEditorPage() {
     // finishing (or breaking) a pinch — don't fall through to draw/select
     if (pinch.current) {
       if (pointers.current.size < 2) pinch.current = null;
+      return;
+    }
+    if (resize.current) {
+      resize.current = null;
       return;
     }
     if (drag.current) {
@@ -813,6 +860,23 @@ export default function BoardEditorPage() {
     svgRef.current?.setPointerCapture(e.pointerId);
   }
 
+  /** Begin dragging one end of an arrow. */
+  function startResize(
+    e: React.PointerEvent,
+    movement: BoardMovement,
+    end: ArrowEnd
+  ) {
+    e.stopPropagation();
+    setSelected(selMovements([movement.id]));
+    resize.current = {
+      id: movement.id,
+      end,
+      from: movement.points.map((pt) => ({ ...pt })),
+    };
+    dragUndoTaken.current = false;
+    svgRef.current?.setPointerCapture(e.pointerId);
+  }
+
   /** The existing selection if this item belongs to it (group drag), else
    *  a fresh single-item selection. */
   function selectionFor(
@@ -847,6 +911,15 @@ export default function BoardEditorPage() {
         e,
         selectionFor("movements", movement.id, selMovements([movement.id]))
       );
+    } else if (mode.kind === "draw") {
+      // Tapping an arrow with a drawing tool active used to start a second
+      // arrow on top of it. Grab the existing one instead — but only on a
+      // close hit, so a stroke starting near an arrow (off the end of a run,
+      // say) still draws.
+      if (distanceToPath(movement.points, toPitch(e)) > DRAW_MODE_GRAB_UNITS)
+        return;
+      e.stopPropagation();
+      startDrag(e, selMovements([movement.id]));
     } else if (mode.kind === "erase") {
       e.stopPropagation();
       commit((b) => ({
@@ -1219,7 +1292,7 @@ export default function BoardEditorPage() {
   const hint = (
     <p className="text-center text-xs text-stone-400">
       {mode.kind === "move" &&
-        "Tap to select, drag to move — or drag over empty pitch to select several."}
+        "Tap to select, drag to move — or drag over empty pitch to select several. Tap an arrow to grab its ends and resize it."}
       {mode.kind === "place" &&
         `Tap the pitch to place a ${TOKEN_LABELS[mode.token].toLowerCase()} — or tap an existing icon to move it.`}
       {mode.kind === "draw" &&
@@ -1317,7 +1390,10 @@ export default function BoardEditorPage() {
     <div className="flex flex-col gap-2 rounded-lg border border-pitch bg-emerald-50 px-3 py-2">
       <div className="flex items-center justify-between gap-2">
         <span className="min-w-0 truncate text-sm font-semibold text-pitch">
-          {selectedLabel} selected — drag to move
+          {selectedLabel}
+          {selectedMovement && selCount(selected) === 1
+            ? " — drag an end to resize"
+            : " selected — drag to move"}
         </span>
         <div className="flex shrink-0 gap-2">
           <button
@@ -1397,6 +1473,30 @@ export default function BoardEditorPage() {
     />
   );
 
+  /** The two round grips on a selected arrow's ends. Dragging one
+   *  lengthens, shortens or swings the arrow; the other end stays put. */
+  const arrowHandles = (m: BoardMovement) => {
+    if (m.points.length < 2) return null;
+    const ends: { end: ArrowEnd; pt: Pt }[] = [
+      { end: "start", pt: m.points[0] },
+      { end: "end", pt: m.points[m.points.length - 1] },
+    ];
+    return ends.map(({ end, pt }) => (
+      <g
+        key={end}
+        transform={`translate(${pt.x} ${pt.y})`}
+        style={{ cursor: "pointer" }}
+        onPointerDown={(e) => startResize(e, m, end)}
+        data-testid={`arrow-handle-${end}`}
+      >
+        {/* generous grab area, same as the icons get */}
+        <circle r={6} fill="transparent" />
+        <circle r={2.6} fill="#ffffff" stroke="#1E5B3C" strokeWidth={0.9} />
+        <circle r={1} fill="#1E5B3C" />
+      </g>
+    ));
+  };
+
   let selectionOverlay: React.ReactNode = null;
   if (selected) {
     const selTk = board.tokens.filter((t) => selected.tokens.includes(t.id));
@@ -1413,8 +1513,16 @@ export default function BoardEditorPage() {
         const pos = animPositions?.get(selTk[0].id) ?? selTk[0];
         deleteAt = { x: pos.x + 7, y: pos.y - 7 };
       } else if (selMv.length === 1 && selMv[0].points.length > 0) {
-        const mid = selMv[0].points[Math.floor(selMv[0].points.length / 2)];
-        deleteAt = { x: mid.x, y: mid.y - 8.5 };
+        // offset square to the arrow, so it never lands on the line itself
+        // or on the grab handles now sitting at either end
+        const pts = selMv[0].points;
+        const mid = pts[Math.floor(pts.length / 2)];
+        const a = pts[0];
+        const b = pts[pts.length - 1];
+        const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+        const nx = -(b.y - a.y) / len;
+        const ny = (b.x - a.x) / len;
+        deleteAt = { x: mid.x + nx * 8.5, y: mid.y + ny * 8.5 };
       } else if (selMs.length === 1) {
         deleteAt = {
           x: (selMs[0].a.x + selMs[0].b.x) / 2,
@@ -1435,6 +1543,8 @@ export default function BoardEditorPage() {
             preview
           />
         ))}
+        {selMv.length === 1 && selCount(selected) === 1 &&
+          arrowHandles(selMv[0])}
         {selMs.map((m) => (
           <MeasureGlyph
             key={m.id}

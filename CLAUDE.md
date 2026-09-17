@@ -82,7 +82,10 @@ Five bottom-nav tabs, components colocated by feature under `app/(tabs)/`:
    branch on `diagramSpec` (spec diagram) vs `boardId` (a coach-linked board).
    The Board tab holds only the coach's own boards.
 3. **Sessions** — session builder picking drills to ~60 min with a running
-   counter, reorder, duplicate past session. Roll call per session
+   counter, duplicate past session. The plan reorders by **dragging the ⠿
+   handle** on each row (same pattern as the Team tab's roster: pointer
+   capture plus `elementsFromPoint` against `data-did`); the handle also
+   takes ArrowUp/ArrowDown, so reordering isn't pointer-only. Roll call per session
    (`attendeeIds`) and a fullscreen Present mode that steps through the
    session drill by drill (with linked diagrams) at training.
 4. **Board** — whiteboard library for drawing drills, training games and set
@@ -100,7 +103,18 @@ Five bottom-nav tabs, components colocated by feature under `app/(tabs)/`:
    surface with a dashed green boundary, seal-green player discs with white
    numbers, red defender discs, brass-orange triangle cones, dark-ink runs and
    brass-orange passes — see `MOVEMENT_STYLE`, `TokenGlyph`, `Pitch`). Touch-first editor:
-   tap-to-place, drag-to-move, drag-to-draw, erase, undo. Extras: ▶ Play
+   tap-to-place, drag-to-move, drag-to-draw, erase, undo. A selected arrow
+   grows a round **grip at each end**; dragging one resizes the arrow while
+   the other end stays put. For a straight arrow that just moves the
+   endpoint; a curved or freehand path is rotated and scaled about the fixed
+   end so its shape survives (`lib/boardGeometry.ts`, unit-tested — the
+   transform is a complex division mapping the old end onto the new one).
+   Tapping an arrow **while a drawing tool is active** grabs that arrow
+   instead of starting a second one on top of it, but only on a close hit
+   (`DRAW_MODE_GRAB_UNITS`) — the arrow's hit band is deliberately much
+   fatter than that for Move/Erase, and a stroke begun near an arrow must
+   still draw. The selected arrow's delete × is offset square to the line so
+   it never sits under a grip. Extras: ▶ Play
    animates tokens along their arrows (nearest token to an arrow's start
    gets paired with it), ⤴ shares the board as a PNG, cones have a colour
    picker, players a number picker, and there's a Dad token for helpers.
