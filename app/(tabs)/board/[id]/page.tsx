@@ -157,8 +157,13 @@ export default function BoardEditorPage() {
   const [showSettings, setShowSettings] = useState(false);
 
   // Landscape pitch when the window is wider than tall (desktop, rotated
-  // phone/tablet); portrait pitch otherwise.
-  const [landscape, setLandscape] = useState(false);
+  // phone/tablet); portrait pitch otherwise. The Rotate button overrides
+  // that choice — null means "follow the screen".
+  const [wideScreen, setWideScreen] = useState(false);
+  const [rotateTo, setRotateTo] = useState<"landscape" | "portrait" | null>(
+    null
+  );
+  const landscape = rotateTo ? rotateTo === "landscape" : wideScreen;
   const [fullscreen, setFullscreen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -316,7 +321,12 @@ export default function BoardEditorPage() {
     const mq = window.matchMedia(
       "(min-width: 640px) and (orientation: landscape)"
     );
-    const update = () => setLandscape(mq.matches);
+    const update = () => {
+      setWideScreen(mq.matches);
+      // physically turning the phone or resizing the window is a clearer
+      // statement of intent than an earlier tap, so it takes the wheel back
+      setRotateTo(null);
+    };
     update();
     mq.addEventListener("change", update);
     return () => mq.removeEventListener("change", update);
@@ -481,6 +491,8 @@ export default function BoardEditorPage() {
   const H = pitchHeight(board ?? {});
   const widthM = boardWidthM(board ?? {});
   const iconScale = iconScaleOf(board ?? {});
+  // how far the board is turned on screen; lettering is spun back by this
+  const screenDelta = landscape ? -90 : 0;
 
   // The SVG viewBox when fully zoomed out — pitch space in portrait, the
   // rotated space in landscape.
@@ -1589,6 +1601,7 @@ export default function BoardEditorPage() {
               color: mode.token === "cone" ? coneColor : undefined,
             }}
             scale={iconScale}
+            screenDelta={screenDelta}
           />
         </g>
       );
@@ -1619,8 +1632,6 @@ export default function BoardEditorPage() {
         pointerEvents="none"
       />
     ) : null;
-
-  const screenDelta = landscape ? -90 : 0;
 
   const boardContent = (
     <>
@@ -1693,7 +1704,7 @@ export default function BoardEditorPage() {
             {/* generous invisible hit area for cold thumbs — never shrinks
                 below the standard size, however small the icons are drawn */}
             <circle r={Math.max(6, 6 * iconScale)} fill="transparent" />
-            <TokenGlyph token={t} scale={iconScale} />
+            <TokenGlyph token={t} scale={iconScale} screenDelta={screenDelta} />
             {/* mouse-only hover ring (see globals.css) */}
             <circle
               className="hover-ring"
@@ -1729,6 +1740,23 @@ export default function BoardEditorPage() {
     </button>
   ) : null;
 
+  // How much of the window's width the canvas can have: a wide screen also
+  // carries the 240px tool sidebar, a phone stacks the tools above instead.
+  const gutterPx = wideScreen ? 300 : 32;
+
+  // A portrait board is normally as wide as its column, which is right on a
+  // phone. Forced into portrait on a wide screen it would run metres off the
+  // bottom of the page, so there it's sized from its height instead.
+  const portraitStyle: React.CSSProperties = wideScreen
+    ? {
+        aspectRatio: `${PITCH_W} / ${H}`,
+        height: `min(calc(100dvh - 150px), calc((100vw - ${gutterPx}px) * ${
+          H / PITCH_W
+        }))`,
+        margin: "0 auto",
+      }
+    : { aspectRatio: `${PITCH_W} / ${H}` };
+
   const svgEl = landscape ? (
     <svg
       ref={svgRef}
@@ -1736,7 +1764,11 @@ export default function BoardEditorPage() {
       className={`mx-auto touch-none select-none rounded-xl shadow-sm ${canvasCursor}`}
       style={{
         aspectRatio: `${H} / ${PITCH_W}`,
-        height: "min(calc(100dvh - 150px), calc((100vw - 300px) * 0.714))",
+        // the second term keeps a wide, short board inside the column —
+        // and on a phone turned landscape there's no sidebar to allow for
+        height: `min(calc(100dvh - 150px), calc((100vw - ${gutterPx}px) * ${
+          PITCH_W / H
+        }))`,
       }}
       onPointerDown={onCanvasPointerDown}
       onPointerMove={onCanvasPointerMove}
@@ -1752,8 +1784,10 @@ export default function BoardEditorPage() {
     <svg
       ref={svgRef}
       viewBox={viewBoxStr}
-      className={`w-full touch-none select-none rounded-xl shadow-sm ${canvasCursor}`}
-      style={{ aspectRatio: `${PITCH_W} / ${H}` }}
+      className={`touch-none select-none rounded-xl shadow-sm ${
+        wideScreen ? "" : "w-full"
+      } ${canvasCursor}`}
+      style={portraitStyle}
       onPointerDown={onCanvasPointerDown}
       onPointerMove={onCanvasPointerMove}
       onPointerUp={onCanvasPointerUp}
@@ -1774,11 +1808,16 @@ export default function BoardEditorPage() {
   );
 
   return (
+    // pb-24 clears the fixed bottom nav, so the foot of a tall board can
+    // always be scrolled out from under it
     <div
       ref={containerRef}
-      className="flex min-h-dvh flex-col gap-3 overflow-y-auto bg-stone-100 px-4 pt-4"
+      className="flex min-h-dvh flex-col gap-3 overflow-y-auto bg-stone-100 px-4 pb-24 pt-4"
     >
-      <header className="mx-auto flex w-full max-w-4xl items-center gap-2">
+      {/* wraps rather than overflowing: an off-screen button could only be
+          reached by scrolling the whole page sideways, which threw off where
+          taps landed on the pitch */}
+      <header className="mx-auto flex w-full max-w-4xl flex-wrap items-center gap-2">
         <Link href="/board" className="min-h-[44px] shrink-0 py-2 text-sm text-stone-500">
           ‹ Boards
         </Link>
@@ -1786,8 +1825,10 @@ export default function BoardEditorPage() {
           value={board.name}
           onChange={(e) => persist({ ...board, name: e.target.value })}
           aria-label="Board name"
-          className="min-h-[44px] w-full min-w-0 rounded-lg border border-transparent bg-transparent px-2 font-semibold outline-none focus:border-stone-300"
+          className="min-h-[44px] min-w-0 flex-1 rounded-lg border border-transparent bg-transparent px-2 font-semibold outline-none focus:border-stone-300"
         />
+        {/* the controls keep together and take their own row on a phone */}
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
         {canPlay(board) && (
           <button
             onClick={play}
@@ -1808,6 +1849,18 @@ export default function BoardEditorPage() {
           ⤴
         </button>
         <button
+          onClick={() =>
+            setRotateTo(landscape ? "portrait" : "landscape")
+          }
+          aria-label={landscape ? "Rotate to portrait" : "Rotate to landscape"}
+          title="Turn the board between portrait and landscape"
+          className="min-h-[44px] shrink-0 rounded-lg border border-stone-300 bg-white px-3 text-sm font-semibold text-stone-600"
+        >
+          ⟳ <span className="hidden sm:inline">
+            {landscape ? "Portrait" : "Landscape"}
+          </span>
+        </button>
+        <button
           onClick={() => setShowSettings((v) => !v)}
           aria-pressed={showSettings}
           aria-label="Board size"
@@ -1818,7 +1871,7 @@ export default function BoardEditorPage() {
               : "border-stone-300 bg-white text-stone-600"
           }`}
         >
-          ⇲ Size
+          ⇲ <span className="hidden sm:inline">Size</span>
         </button>
         <button
           onClick={() => setSnap((v) => !v)}
@@ -1831,7 +1884,7 @@ export default function BoardEditorPage() {
               : "border-stone-300 bg-white text-stone-600"
           }`}
         >
-          # Grid
+          # <span className="hidden sm:inline">Grid</span>
         </button>
         <button
           onClick={toggleFullscreen}
@@ -1848,9 +1901,12 @@ export default function BoardEditorPage() {
         >
           Undo
         </button>
+        </div>
       </header>
 
-      {landscape ? (
+      {/* the sidebar layout is about how much room the screen has, not which
+          way the board is turned — rotating a board keeps the sidebar */}
+      {wideScreen ? (
         <div className="flex flex-1 items-start justify-center gap-4">
           <div className="flex w-[240px] shrink-0 flex-col gap-2">
             <div data-palette className="flex flex-wrap gap-1.5">

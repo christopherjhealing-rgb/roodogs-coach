@@ -118,7 +118,21 @@ Five bottom-nav tabs, components colocated by feature under `app/(tabs)/`:
    animates tokens along their arrows (nearest token to an arrow's start
    gets paired with it), ⤴ shares the board as a PNG, cones have a colour
    picker, players a number picker, and there's a Dad token for helpers.
-   Landscape layout on wide screens plus a fullscreen button. The palette
+   Landscape layout on wide screens plus a fullscreen button. A **Rotate**
+   button turns the board between portrait and landscape by hand; it
+   overrides the `(min-width: 640px) and (orientation: landscape)` media
+   query, and an actual screen change (turning the phone, resizing the
+   window) clears the override so the device takes the wheel back. Which way
+   the **board** is turned is separate from which **layout** the page uses:
+   the tool sidebar follows the screen's width, so rotating a board on a
+   desktop keeps the sidebar rather than dropping to the stacked phone
+   layout. Sizing is driven from the height in both orientations, with a
+   gutter allowance that knows whether the sidebar is there (`gutterPx`) —
+   otherwise a phone forced to landscape budgets for a sidebar it hasn't got
+   and renders the board postage-stamp sized. Shapes turn with the pitch the
+   way cones would on a real board, but lettering (player numbers, the Dad
+   "D") is spun back upright via `screenDelta` — see `Upright` in
+   `BoardCanvas.tsx`. The palette
    collapses into **People / Equipment / Arrows** dropdowns (each with a stable
    `aria-label`) so the whole toolbar fits a phone without sideways scrolling;
    Move, Distance and Erase stay as direct buttons. **Two-finger pinch** zooms

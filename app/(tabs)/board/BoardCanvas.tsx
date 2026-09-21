@@ -181,19 +181,42 @@ export function Pitch({
 }
 
 /** A board token, drawn at the origin. `scale` shrinks/grows the glyph
- *  without moving it (see Board.iconScale). */
+ *  without moving it (see Board.iconScale). `screenDelta` is how far the
+ *  board itself has been turned, so lettering can be kept upright. */
 export function TokenGlyph({
   token,
   scale = 1,
+  screenDelta = 0,
 }: {
   token: BoardToken;
   scale?: number;
+  screenDelta?: number;
 }) {
-  const shape = <TokenShape token={token} />;
+  const shape = <TokenShape token={token} screenDelta={screenDelta} />;
   return scale === 1 ? shape : <g transform={`scale(${scale})`}>{shape}</g>;
 }
 
-function TokenShape({ token }: { token: BoardToken }) {
+/** Keeps a label the right way up on a turned board. Shapes rotate with the
+ *  pitch the way cones would on a real one; only the lettering is spun back,
+ *  because sideways numbers can't be read at a glance. */
+function Upright({
+  screenDelta,
+  children,
+}: {
+  screenDelta: number;
+  children: React.ReactNode;
+}) {
+  if (!screenDelta) return <>{children}</>;
+  return <g transform={`rotate(${-screenDelta})`}>{children}</g>;
+}
+
+function TokenShape({
+  token,
+  screenDelta = 0,
+}: {
+  token: BoardToken;
+  screenDelta?: number;
+}) {
   switch (token.type) {
     case "player":
       // seal-green disc with a white number — matches the drill attackers
@@ -201,15 +224,17 @@ function TokenShape({ token }: { token: BoardToken }) {
         <g>
           <circle r={3.4} fill="#1E5B3C" stroke="#12332A" strokeWidth={0.5} />
           {token.label && (
-            <text
-              textAnchor="middle"
-              dy={1.2}
-              fontSize={3.3}
-              fontWeight={700}
-              fill="#ffffff"
-            >
-              {token.label}
-            </text>
+            <Upright screenDelta={screenDelta}>
+              <text
+                textAnchor="middle"
+                dy={1.2}
+                fontSize={3.3}
+                fontWeight={700}
+                fill="#ffffff"
+              >
+                {token.label}
+              </text>
+            </Upright>
           )}
         </g>
       );
@@ -228,15 +253,17 @@ function TokenShape({ token }: { token: BoardToken }) {
             fill="#f5f5f4"
           />
           <rect x={-3.4} y={-1.5} width={6.8} height={0.9} rx={0.45} fill="#f5f5f4" />
-          <text
-            textAnchor="middle"
-            dy={3.2}
-            fontSize={2.6}
-            fontWeight={700}
-            fill="#f5f5f4"
-          >
-            D
-          </text>
+          <Upright screenDelta={screenDelta}>
+            <text
+              textAnchor="middle"
+              dy={3.2}
+              fontSize={2.6}
+              fontWeight={700}
+              fill="#f5f5f4"
+            >
+              D
+            </text>
+          </Upright>
         </g>
       );
     case "cone": {
