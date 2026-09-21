@@ -135,6 +135,10 @@ export type MovementType =
   /** Freehand pen — a plain drawn line with no arrowhead. */
   | "draw";
 
+/** A player's job in the phase being drawn, shown as the disc colour so a
+ *  breakdown picture reads at a glance. Unset = an ordinary player. */
+export type PlayerRole = "anchor" | "jackler" | "tackler" | "tackled";
+
 /** Marker shape for a cone token: the classic upright cone, a flat disc
  *  marker, or a square. Defaults to triangle when unset. */
 export type ConeShape = "triangle" | "circle" | "square";
@@ -151,6 +155,8 @@ export interface BoardToken {
   color?: string;
   /** Cone marker shape; only meaningful for cones. */
   shape?: ConeShape;
+  /** Player's role in this picture; only meaningful for players. */
+  role?: PlayerRole;
 }
 
 /** A movement arrow drawn on the whiteboard, start to finish. */
@@ -158,6 +164,10 @@ export interface BoardMovement {
   id: string;
   type: MovementType;
   points: { x: number; y: number }[];
+  /** Stroke colour override — set by the pen tool. */
+  color?: string;
+  /** Stroke width override in pitch units — set by the pen tool. */
+  width?: number;
 }
 
 /** A distance marker: a dimension line between two points, labelled in

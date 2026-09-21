@@ -131,7 +131,17 @@ Five bottom-nav tabs, components colocated by feature under `app/(tabs)/`:
    order at render time and never stored on the token, so deleting the first
    7 promotes the second to solid by itself; the ghost forecasts the shade
    before you tap, and the list thumbnail and `AnimatedBoard` shade the same
-   way.
+   way. The number row also takes a **typed label** ("Other" — up to three
+   characters, upper-cased) so a player can be "SH" or "N8"; three-letter
+   labels step the font down. Players can carry a **role** — anchor
+   (brass), jackler (purple), tackler (blue), been tackled (grey) —
+   `PlayerRole` on the token, colours in `PLAYER_ROLES`; a role's colour
+   wins over the repeat ramp, and the legend lists any role in use so the
+   board explains itself. Red is deliberately not a role colour: it already
+   means the opposition and the tackle arrow. The **pen** has its own colour
+   (the cone palette plus its default brass) and weight (`PEN_WIDTHS`:
+   thin / medium / thick), stored per stroke as `color` / `width` on the
+   movement; arrows never carry either, so their house styles stay fixed.
    Landscape layout on wide screens plus a fullscreen button. A **Rotate**
    button turns the board between portrait and landscape by hand; it
    overrides the `(min-width: 640px) and (orientation: landscape)` media
@@ -189,7 +199,11 @@ Five bottom-nav tabs, components colocated by feature under `app/(tabs)/`:
    `BoardCanvas.tsx` — `boardWidthM` / `boardLengthM` / `pitchHeight` /
    `iconScaleOf`, unit-tested in `app/(tabs)/board/boardSize.test.ts`.
    The Distance tool draws dimension lines labelled in metres, and grid lock
-   snaps at a selectable step (`GRID_STEPS_M`) derived from the width.
+   snaps at a selectable step (`GRID_STEPS_M`) derived from the width. With
+   grid lock on, an arrow is straight and both ends land on the nearest grid
+   point — **any** grid point (`gridPoint`), so a pass can go cone to cone
+   at whatever angle the cones make. An earlier version forced the eight
+   compass directions; it looked tidy and stopped exactly that.
    Those steps are a **nested ladder — 0.5 / 2.5 / 5 / 10 m, each a whole
    multiple of the one below** — so a cone snapped on one grid still sits on
    an intersection of every finer grid and changing the step never strands

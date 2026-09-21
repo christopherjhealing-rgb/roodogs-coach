@@ -7,6 +7,7 @@ import type {
   BoardToken,
   ConeShape,
   MovementType,
+  PlayerRole,
   TokenType,
 } from "@/lib/types";
 
@@ -85,6 +86,32 @@ export function playerRepeatIndex(
   }
   return out;
 }
+
+/**
+ * Role colours for players. Red is avoided — it already means the
+ * opposition and the tackle arrow. Anchor is brass (the brand's third
+ * colour), jackler purple, tackler blue, and a player who's been tackled
+ * goes grey: down, out of the picture.
+ */
+export const PLAYER_ROLES: {
+  role: PlayerRole;
+  label: string;
+  fill: string;
+  stroke: string;
+  text: string;
+}[] = [
+  { role: "anchor", label: "Anchor", fill: "#C9A227", stroke: "#8a6d12", text: "#12332A" },
+  { role: "jackler", label: "Jackler", fill: "#7c3aed", stroke: "#4c1d95", text: "#ffffff" },
+  { role: "tackler", label: "Tackler", fill: "#2563eb", stroke: "#1e3a8a", text: "#ffffff" },
+  { role: "tackled", label: "Been tackled", fill: "#78716c", stroke: "#44403c", text: "#ffffff" },
+];
+
+/** Pen stroke widths, in pitch units. Medium is the arrows' own weight. */
+export const PEN_WIDTHS: { label: string; width: number }[] = [
+  { label: "Thin", width: 0.7 },
+  { label: "Medium", width: 1.1 },
+  { label: "Thick", width: 2.2 },
+];
 
 /** The marker shapes a cone can take, in picker order. */
 export const CONE_SHAPES: { shape: ConeShape; label: string }[] = [
@@ -313,8 +340,12 @@ function TokenShape({
     case "player": {
       // seal-green disc with a white number — matches the drill attackers;
       // a repeated number steps down the shade ramp
+      // a role sets the colour outright; otherwise repeats step down the ramp
+      const role = token.role && PLAYER_ROLES.find((r) => r.role === token.role);
       const shade =
-        PLAYER_SHADES[Math.min(repeat, PLAYER_SHADES.length - 1)];
+        role ?? PLAYER_SHADES[Math.min(repeat, PLAYER_SHADES.length - 1)];
+      // "SH" fits at full size; a three-letter label needs to come down a notch
+      const fontSize = (token.label?.length ?? 0) > 2 ? 2.4 : 3.3;
       return (
         <g>
           <circle r={3.4} fill={shade.fill} stroke={shade.stroke} strokeWidth={0.5} />
@@ -322,8 +353,8 @@ function TokenShape({
             <Upright screenDelta={screenDelta}>
               <text
                 textAnchor="middle"
-                dy={1.2}
-                fontSize={3.3}
+                dy={fontSize === 3.3 ? 1.2 : 0.9}
+                fontSize={fontSize}
                 fontWeight={700}
                 fill={shade.text}
               >
@@ -494,6 +525,9 @@ export function MovementGlyph({
   }
 
   const angle = Math.atan2(end.y - arrowFrom.y, end.x - arrowFrom.x);
+  // the pen can pick its own colour and weight; arrows keep their house style
+  const color = movement.color ?? style.color;
+  const width = movement.width ?? 1.1;
 
   return (
     <g
@@ -506,7 +540,7 @@ export function MovementGlyph({
           d={d}
           fill="none"
           stroke="transparent"
-          strokeWidth={hitWidth}
+          strokeWidth={Math.max(hitWidth, width + 2)}
           style={{ cursor: "pointer" }}
           onPointerDown={onPointerDown}
         />
@@ -514,8 +548,8 @@ export function MovementGlyph({
       <path
         d={d}
         fill="none"
-        stroke={style.color}
-        strokeWidth={1.1}
+        stroke={color}
+        strokeWidth={width}
         strokeDasharray={style.dash}
         strokeLinecap="round"
         pointerEvents="none"

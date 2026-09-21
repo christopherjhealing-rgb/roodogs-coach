@@ -12,6 +12,7 @@ import type {
   BoardToken,
   ConeShape,
   MovementType,
+  PlayerRole,
   TokenType,
 } from "@/lib/types";
 import {
@@ -22,6 +23,8 @@ import {
   GRID_STEPS_M,
   MOVEMENT_STYLE,
   MeasureGlyph,
+  PEN_WIDTHS,
+  PLAYER_ROLES,
   MovementGlyph,
   PITCH_W,
   Pitch,
@@ -119,28 +122,15 @@ interface Snapshot {
 
 type Pt = { x: number; y: number };
 
-const OCT_X = [1, 1, 0, -1, -1, -1, 0, 1];
-const OCT_Y = [0, 1, 1, 1, 0, -1, -1, -1];
-
-/** With grid lock on, arrows snap to the eight compass directions with
- *  endpoints on grid intersections (whole steps from the start). */
-function eightWaySnap(start: Pt, p: Pt, step: number, h: number): Pt {
-  const dx = p.x - start.x;
-  const dy = p.y - start.y;
-  const len = Math.hypot(dx, dy);
-  if (len < 0.01) return { ...start };
-  const oct = ((Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) % 8) + 8) % 8;
-  const ux = OCT_X[oct];
-  const uy = OCT_Y[oct];
-  const dirLen = Math.hypot(ux, uy); // 1 for cardinal, √2 for diagonal
-  let n = Math.max(1, Math.round(len / (step * dirLen)));
-  const inBounds = (k: number) => {
-    const x = start.x + ux * k * step;
-    const y = start.y + uy * k * step;
-    return x >= 0 && x <= PITCH_W && y >= 0 && y <= h;
+/** With grid lock on, an arrow's end lands on the nearest grid point —
+ *  any grid point, so a pass can go cone to cone at whatever angle the
+ *  cones make. (An earlier version forced the eight compass directions,
+ *  which looked tidy and stopped exactly that.) */
+function gridPoint(p: Pt, step: number, h: number): Pt {
+  return {
+    x: Math.min(PITCH_W, Math.max(0, snapToGrid(p.x, step))),
+    y: Math.min(h, Math.max(0, snapToGrid(p.y, step))),
   };
-  while (n > 1 && !inBounds(n)) n--;
-  return { x: start.x + ux * n * step, y: start.y + uy * n * step };
 }
 
 export default function BoardEditorPage() {
@@ -157,8 +147,14 @@ export default function BoardEditorPage() {
   const [undoStack, setUndoStack] = useState<Snapshot[]>([]);
   const [coneColor, setConeColor] = useState(CONE_COLORS[0].fill);
   const [coneShape, setConeShape] = useState<ConeShape>("triangle");
-  // null = automatic numbering (next free number)
-  const [playerNum, setPlayerNum] = useState<number | null>(null);
+  // null = automatic numbering (next free number); otherwise the label to
+  // put on the next player — a number, or a position like "SH"
+  const [playerLabel, setPlayerLabel] = useState<string | null>(null);
+  // role given to newly placed players (unset = ordinary)
+  const [playerRole, setPlayerRole] = useState<PlayerRole | undefined>();
+  // pen style
+  const [penColor, setPenColor] = useState(MOVEMENT_STYLE.draw.color);
+  const [penWidth, setPenWidth] = useState(PEN_WIDTHS[1].width);
   // grid lock — snap placement/moves to the grid so cones line up
   const [snap, setSnap] = useState(false);
   const [gridStepM, setGridStepM] = useState(DEFAULT_GRID_STEP_M);
@@ -451,13 +447,32 @@ export default function BoardEditorPage() {
     }));
   }
 
-  function renumberSelectedPlayer(n: number | undefined) {
+  function restyleSelectedPen(patch: { color?: string; width?: number }) {
+    const m = soleMovement();
+    if (!m || m.type !== "draw") return;
+    if (patch.color) setPenColor(patch.color);
+    if (patch.width) setPenWidth(patch.width);
+    commit((b) => ({
+      movements: b.movements.map((x) =>
+        x.id === m.id ? { ...x, ...patch } : x
+      ),
+    }));
+  }
+
+  function setSelectedPlayerRole(role: PlayerRole | undefined) {
+    const t = soleToken();
+    if (!t || t.type !== "player") return;
+    setPlayerRole(role);
+    commit((b) => ({
+      tokens: b.tokens.map((x) => (x.id === t.id ? { ...x, role } : x)),
+    }));
+  }
+
+  function relabelSelectedPlayer(label: string | undefined) {
     const t = soleToken();
     if (!t) return;
     commit((b) => ({
-      tokens: b.tokens.map((x) =>
-        x.id === t.id ? { ...x, label: n != null ? String(n) : undefined } : x
-      ),
+      tokens: b.tokens.map((x) => (x.id === t.id ? { ...x, label } : x)),
     }));
   }
 
@@ -744,10 +759,11 @@ export default function BoardEditorPage() {
         // Auto counts up on its own; a picked number stays picked until
         // another is chosen, so the same player can be put down more than
         // once — where they start and where they end up in a set play.
-        label = String(playerNum ?? nextAutoNumber(board.tokens));
+        label = playerLabel ?? String(nextAutoNumber(board.tokens));
       }
       const color = mode.token === "cone" ? coneColor : undefined;
       const shape = mode.token === "cone" ? coneShape : undefined;
+      const role = mode.token === "player" ? playerRole : undefined;
       commit((b) => ({
         tokens: [
           ...b.tokens,
@@ -759,6 +775,7 @@ export default function BoardEditorPage() {
             label,
             color,
             shape,
+            role,
           },
         ],
       }));
@@ -816,13 +833,10 @@ export default function BoardEditorPage() {
         dragUndoTaken.current = true;
       }
       const r = resize.current;
-      const anchor =
-        r.end === "start" ? r.from[r.from.length - 1] : r.from[0];
-      // with grid lock on, a resized arrow snaps to the same eight compass
-      // directions it would have been drawn along
+      // with grid lock on, a resized arrow's end lands on a grid point
       const target =
         snap && board.movements.find((m) => m.id === r.id)?.type !== "draw"
-          ? eightWaySnap(anchor, p, stepU, H)
+          ? gridPoint(p, stepU, H)
           : p;
       persist({
         ...board,
@@ -891,11 +905,12 @@ export default function BoardEditorPage() {
     } else if (drawPoints.current.length > 0 && mode.kind === "draw") {
       const pts = drawPoints.current;
       if (snap && mode.movement !== "draw") {
-        // grid lock: straight arrow locked to the 8 compass directions
+        // grid lock: straight arrow to the nearest grid point
         setPreview({
           id: "preview",
           type: mode.movement,
-          points: [pts[0], eightWaySnap(pts[0], p, stepU, H)],
+          points: [pts[0], gridPoint(p, stepU, H)],
+          ...penStyle(mode.movement),
         });
       } else {
         const last = pts[pts.length - 1];
@@ -905,6 +920,7 @@ export default function BoardEditorPage() {
           id: "preview",
           type: mode.movement,
           points: [...pts, p],
+          ...penStyle(mode.movement),
         });
       }
     }
@@ -977,8 +993,8 @@ export default function BoardEditorPage() {
       setPreview(null);
       const gridArrow = snap && mode.movement !== "draw";
       if (gridArrow) {
-        // grid lock: straight, 8-way, grid-length arrow
-        const end = eightWaySnap(pts[0], p, stepU, H);
+        // grid lock: a straight arrow between two grid points
+        const end = gridPoint(p, stepU, H);
         pts = [pts[0], end];
         if (Math.hypot(end.x - pts[0].x, end.y - pts[0].y) < 0.01) return;
       } else {
@@ -990,11 +1006,21 @@ export default function BoardEditorPage() {
         commit((b) => ({
           movements: [
             ...b.movements,
-            { id: newId(), type: mode.movement, points: pts },
+            {
+              id: newId(),
+              type: mode.movement,
+              points: pts,
+              ...penStyle(mode.movement),
+            },
           ],
         }));
       }
     }
+  }
+
+  /** The pen's chosen colour and weight; arrows carry neither. */
+  function penStyle(type: MovementType): { color?: string; width?: number } {
+    return type === "draw" ? { color: penColor, width: penWidth } : {};
   }
 
   /** Select and arm a drag of `sel` starting at the event's position. */
@@ -1461,10 +1487,56 @@ export default function BoardEditorPage() {
     </div>
   );
 
+  /** A label is "typed" when it isn't one of the number chips. */
+  const isTyped = (label: string | null | undefined) =>
+    !!label && !PLAYER_NUMBERS.includes(Number(label));
+
+  const roleRow = (
+    active: PlayerRole | undefined,
+    onPick: (role: PlayerRole | undefined) => void
+  ) => (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <span className="text-xs font-medium text-stone-500">Role:</span>
+      <button
+        onClick={() => onPick(undefined)}
+        aria-pressed={!active}
+        className={`min-h-[36px] rounded-full border px-2.5 text-xs font-semibold ${
+          !active
+            ? "border-pitch bg-pitch text-white"
+            : "border-stone-300 bg-white text-stone-600"
+        }`}
+      >
+        No role
+      </button>
+      {PLAYER_ROLES.map((r) => (
+        <button
+          key={r.role}
+          onClick={() => onPick(r.role)}
+          aria-pressed={active === r.role}
+          className="flex min-h-[36px] items-center gap-1.5 rounded-full border px-2.5 text-xs font-semibold"
+          style={
+            active === r.role
+              ? { background: r.fill, color: r.text, borderColor: r.stroke }
+              : { borderColor: "#d6d3d1", background: "#fff", color: "#57534e" }
+          }
+        >
+          <span
+            aria-hidden
+            className="inline-block h-3 w-3 rounded-full"
+            style={{ background: r.fill, border: `1px solid ${r.stroke}` }}
+          />
+          {r.label}
+        </button>
+      ))}
+    </div>
+  );
+
   const numberRow = (
     isActive: (n: number) => boolean,
     onPick: (n: number) => void,
-    leading: React.ReactNode
+    leading: React.ReactNode,
+    typed: string,
+    onTyped: (label: string) => void
   ) => (
     <div className="flex flex-wrap items-center gap-1.5">
       <span className="text-xs font-medium text-stone-500">Number:</span>
@@ -1483,6 +1555,61 @@ export default function BoardEditorPage() {
           {n}
         </button>
       ))}
+      <span className="pl-1 text-xs font-medium text-stone-500">Other:</span>
+      <input
+        value={typed}
+        onChange={(e) =>
+          onTyped(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 3))
+        }
+        placeholder="SH"
+        aria-label="Other label"
+        className="h-9 w-14 rounded-lg border border-stone-300 px-2 text-center text-sm font-bold uppercase outline-none focus:border-pitch"
+      />
+    </div>
+  );
+
+  /** Colour swatches and stroke weights for the pen. */
+  const penRow = (
+    activeColor: string,
+    activeWidth: number,
+    onColor: (c: string) => void,
+    onWidth: (w: number) => void
+  ) => (
+    <div className="flex flex-wrap items-center gap-y-1.5">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="text-xs font-medium text-stone-500">Pen:</span>
+        {[{ fill: MOVEMENT_STYLE.draw.color, name: "Brass" }, ...CONE_COLORS].map((c) => (
+          <button
+            key={c.fill}
+            onClick={() => onColor(c.fill)}
+            aria-label={`${c.name} pen`}
+            aria-pressed={activeColor === c.fill}
+            className={`h-9 w-9 rounded-full border-2 ${
+              activeColor === c.fill ? "border-pitch" : "border-stone-200"
+            }`}
+            style={{ backgroundColor: c.fill }}
+          />
+        ))}
+      </div>
+      <div className="flex items-center gap-1.5 pl-2">
+        {PEN_WIDTHS.map((w) => (
+          <button
+            key={w.label}
+            onClick={() => onWidth(w.width)}
+            aria-pressed={activeWidth === w.width}
+            className={`flex min-h-[36px] items-center gap-1.5 rounded-full border px-2.5 text-xs font-semibold ${
+              activeWidth === w.width
+                ? "border-pitch bg-pitch text-white"
+                : "border-stone-300 bg-white text-stone-600"
+            }`}
+          >
+            <svg viewBox="0 0 20 8" className="h-2 w-5">
+              <line x1={2} y1={4} x2={18} y2={4} stroke="currentColor" strokeWidth={w.width * 2.2} strokeLinecap="round" />
+            </svg>
+            {w.label}
+          </button>
+        ))}
+      </div>
     </div>
   );
 
@@ -1516,20 +1643,28 @@ export default function BoardEditorPage() {
     );
   } else if (selectedToken?.type === "player") {
     const st = selectedToken;
-    optionsRow = numberRow(
-      (n) => st.label === String(n),
-      (n) => renumberSelectedPlayer(n),
-      <button
-        onClick={() => renumberSelectedPlayer(undefined)}
-        aria-label="No number"
-        className="min-h-[36px] rounded-full border border-stone-300 bg-white px-2.5 text-xs font-medium text-stone-500"
-      >
-        None
-      </button>
+    optionsRow = (
+      <div className="flex flex-col gap-1.5">
+        {numberRow(
+          (n) => st.label === String(n),
+          (n) => relabelSelectedPlayer(String(n)),
+          <button
+            onClick={() => relabelSelectedPlayer(undefined)}
+            aria-label="No number"
+            className="min-h-[36px] rounded-full border border-stone-300 bg-white px-2.5 text-xs font-medium text-stone-500"
+          >
+            None
+          </button>,
+          isTyped(st.label) ? st.label! : "",
+          (label) => relabelSelectedPlayer(label || undefined)
+        )}
+        {roleRow(st.role, (role) => setSelectedPlayerRole(role))}
+      </div>
     );
   } else if (selectedMovement) {
     const sm = selectedMovement;
     optionsRow = (
+      <div className="flex flex-col gap-1.5">
       <div className="flex flex-wrap items-center gap-1.5">
         <span className="text-xs font-medium text-stone-500">Type:</span>
         {MOVEMENT_TYPES.map((m) => (
@@ -1547,7 +1682,17 @@ export default function BoardEditorPage() {
           </button>
         ))}
       </div>
+      {sm.type === "draw" &&
+        penRow(
+          sm.color ?? MOVEMENT_STYLE.draw.color,
+          sm.width ?? PEN_WIDTHS[1].width,
+          (color) => restyleSelectedPen({ color }),
+          (width) => restyleSelectedPen({ width })
+        )}
+      </div>
     );
+  } else if (mode.kind === "draw" && mode.movement === "draw") {
+    optionsRow = penRow(penColor, penWidth, setPenColor, setPenWidth);
   } else if (mode.kind === "place" && mode.token === "cone") {
     optionsRow = coneRow(
       coneColor,
@@ -1556,20 +1701,27 @@ export default function BoardEditorPage() {
       (shape) => setConeShape(shape)
     );
   } else if (mode.kind === "place" && mode.token === "player") {
-    optionsRow = numberRow(
-      (n) => playerNum === n,
-      (n) => setPlayerNum(n),
-      <button
-        onClick={() => setPlayerNum(null)}
-        aria-pressed={playerNum === null}
-        className={`min-h-[36px] rounded-full border px-2.5 text-xs font-semibold ${
-          playerNum === null
-            ? "border-pitch bg-pitch text-white"
-            : "border-stone-300 bg-white text-stone-600"
-        }`}
-      >
-        Auto
-      </button>
+    optionsRow = (
+      <div className="flex flex-col gap-1.5">
+        {numberRow(
+          (n) => playerLabel === String(n),
+          (n) => setPlayerLabel(String(n)),
+          <button
+            onClick={() => setPlayerLabel(null)}
+            aria-pressed={playerLabel === null}
+            className={`min-h-[36px] rounded-full border px-2.5 text-xs font-semibold ${
+              playerLabel === null
+                ? "border-pitch bg-pitch text-white"
+                : "border-stone-300 bg-white text-stone-600"
+            }`}
+          >
+            Auto
+          </button>,
+          isTyped(playerLabel) ? playerLabel! : "",
+          (label) => setPlayerLabel(label || null)
+        )}
+        {roleRow(playerRole, setPlayerRole)}
+      </div>
     );
   }
 
@@ -1617,8 +1769,21 @@ export default function BoardEditorPage() {
     </div>
   ) : null;
 
+  const rolesInUse = PLAYER_ROLES.filter((r) =>
+    board.tokens.some((t) => t.type === "player" && t.role === r.role)
+  );
   const legend = (
     <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-stone-500">
+      {rolesInUse.map((r) => (
+        <span key={r.role} className="flex items-center gap-1.5">
+          <span
+            aria-hidden
+            className="inline-block h-3 w-3 rounded-full"
+            style={{ background: r.fill, border: `1px solid ${r.stroke}` }}
+          />
+          {r.label}
+        </span>
+      ))}
       {MOVEMENT_TYPES.map((m) => (
         <span key={m} className="flex items-center gap-1.5">
           <svg viewBox="0 0 24 8" className="h-2.5 w-7 rounded-sm bg-stone-100 ring-1 ring-stone-200">
@@ -1775,7 +1940,7 @@ export default function BoardEditorPage() {
       const gy = snapToGrid(hoverPos.y, snapStep);
       const label =
         mode.token === "player"
-          ? String(playerNum ?? nextAutoNumber(board.tokens))
+          ? (playerLabel ?? String(nextAutoNumber(board.tokens)))
           : undefined;
       // show the shade this placement will land with (a second 7 is lighter)
       const ghostRepeat = label
@@ -1797,6 +1962,7 @@ export default function BoardEditorPage() {
               label,
               color: mode.token === "cone" ? coneColor : undefined,
               shape: mode.token === "cone" ? coneShape : undefined,
+              role: mode.token === "player" ? playerRole : undefined,
             }}
             scale={iconScale}
             screenDelta={screenDelta}
