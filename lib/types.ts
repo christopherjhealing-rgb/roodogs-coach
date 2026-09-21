@@ -135,6 +135,10 @@ export type MovementType =
   /** Freehand pen — a plain drawn line with no arrowhead. */
   | "draw";
 
+/** Marker shape for a cone token: the classic upright cone, a flat disc
+ *  marker, or a square. Defaults to triangle when unset. */
+export type ConeShape = "triangle" | "circle" | "square";
+
 /** A thing placed on the whiteboard. Coordinates are in pitch units
  *  (0–100 across, 0–140 down), not pixels. */
 export interface BoardToken {
@@ -145,6 +149,8 @@ export interface BoardToken {
   label?: string;
   /** Fill colour override — currently used for cones. */
   color?: string;
+  /** Cone marker shape; only meaningful for cones. */
+  shape?: ConeShape;
 }
 
 /** A movement arrow drawn on the whiteboard, start to finish. */

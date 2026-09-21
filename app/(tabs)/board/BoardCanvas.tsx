@@ -5,6 +5,7 @@ import type {
   BoardKind,
   BoardMovement,
   BoardToken,
+  ConeShape,
   MovementType,
   TokenType,
 } from "@/lib/types";
@@ -51,6 +52,40 @@ export const CONE_COLORS: { fill: string; stroke: string; name: string }[] = [
 
 function coneStroke(fill: string): string {
   return CONE_COLORS.find((c) => c.fill === fill)?.stroke ?? "#ea580c";
+}
+
+/** The marker shapes a cone can take, in picker order. */
+export const CONE_SHAPES: { shape: ConeShape; label: string }[] = [
+  { shape: "triangle", label: "Cone" },
+  { shape: "circle", label: "Disc" },
+  { shape: "square", label: "Square" },
+];
+
+/** The drawn outline of a cone marker, centred on the origin. Shared by the
+ *  board glyph and the shape picker so they can't drift apart. */
+export function ConeMarker({
+  shape = "triangle",
+  fill,
+}: {
+  shape?: ConeShape;
+  fill: string;
+}) {
+  const common = {
+    fill,
+    stroke: coneStroke(fill),
+    strokeWidth: 0.4,
+    strokeLinejoin: "round" as const,
+  };
+  switch (shape) {
+    case "circle":
+      // flat disc marker
+      return <circle r={2.3} {...common} />;
+    case "square":
+      return <rect x={-2.2} y={-2.2} width={4.4} height={4.4} rx={0.4} {...common} />;
+    default:
+      // upright marker cone — matches the drill diagrams
+      return <path d="M -2.4 2.3 L 2.4 2.3 L 0 -2.6 Z" {...common} />;
+  }
 }
 
 export type Surface = "pitch" | "plain";
@@ -284,19 +319,10 @@ function TokenShape({
           </Upright>
         </g>
       );
-    case "cone": {
-      // upright marker cone in its colour — matches the drill diagrams
-      const fill = token.color ?? "#fb923c";
+    case "cone":
       return (
-        <path
-          d="M -2.4 2.3 L 2.4 2.3 L 0 -2.6 Z"
-          fill={fill}
-          stroke={coneStroke(fill)}
-          strokeWidth={0.4}
-          strokeLinejoin="round"
-        />
+        <ConeMarker shape={token.shape} fill={token.color ?? "#fb923c"} />
       );
-    }
     case "hurdle":
       return (
         <rect

@@ -10,11 +10,14 @@ import type {
   BoardMeasure,
   BoardMovement,
   BoardToken,
+  ConeShape,
   MovementType,
   TokenType,
 } from "@/lib/types";
 import {
   CONE_COLORS,
+  CONE_SHAPES,
+  ConeMarker,
   DEFAULT_GRID_STEP_M,
   GRID_STEPS_M,
   MOVEMENT_STYLE,
@@ -152,6 +155,7 @@ export default function BoardEditorPage() {
   >(null);
   const [undoStack, setUndoStack] = useState<Snapshot[]>([]);
   const [coneColor, setConeColor] = useState(CONE_COLORS[0].fill);
+  const [coneShape, setConeShape] = useState<ConeShape>("triangle");
   // null = automatic numbering (next free number)
   const [playerNum, setPlayerNum] = useState<number | null>(null);
   // grid lock — snap placement/moves to the grid so cones line up
@@ -434,6 +438,15 @@ export default function BoardEditorPage() {
     setConeColor(fill);
     commit((b) => ({
       tokens: b.tokens.map((x) => (x.id === t.id ? { ...x, color: fill } : x)),
+    }));
+  }
+
+  function reshapeSelectedCone(shape: ConeShape) {
+    const t = soleToken();
+    if (!t) return;
+    setConeShape(shape);
+    commit((b) => ({
+      tokens: b.tokens.map((x) => (x.id === t.id ? { ...x, shape } : x)),
     }));
   }
 
@@ -727,11 +740,13 @@ export default function BoardEditorPage() {
       setSelected(null);
       let label: string | undefined;
       if (mode.token === "player") {
-        const n = playerNum ?? nextAutoNumber(board.tokens);
-        label = String(n);
-        if (playerNum !== null) setPlayerNum(playerNum + 1);
+        // Auto counts up on its own; a picked number stays picked until
+        // another is chosen, so the same player can be put down more than
+        // once — where they start and where they end up in a set play.
+        label = String(playerNum ?? nextAutoNumber(board.tokens));
       }
       const color = mode.token === "cone" ? coneColor : undefined;
+      const shape = mode.token === "cone" ? coneShape : undefined;
       commit((b) => ({
         tokens: [
           ...b.tokens,
@@ -742,6 +757,7 @@ export default function BoardEditorPage() {
             y: snapToGrid(p.y, snapStep),
             label,
             color,
+            shape,
           },
         ],
       }));
@@ -1414,6 +1430,36 @@ export default function BoardEditorPage() {
     </div>
   );
 
+  /** Colour swatches plus the three marker shapes, drawn in that colour. */
+  const coneRow = (
+    activeFill: string,
+    onFill: (fill: string) => void,
+    activeShape: ConeShape,
+    onShape: (shape: ConeShape) => void
+  ) => (
+    <div className="flex flex-wrap items-center gap-y-1.5">
+      {colourRow(activeFill, onFill)}
+      <div className="flex items-center gap-1.5 pl-2">
+        <span className="text-xs font-medium text-stone-500">Shape:</span>
+        {CONE_SHAPES.map((c) => (
+          <button
+            key={c.shape}
+            onClick={() => onShape(c.shape)}
+            aria-label={`${c.label} shape`}
+            aria-pressed={activeShape === c.shape}
+            className={`flex h-9 w-9 items-center justify-center rounded-full border-2 bg-white ${
+              activeShape === c.shape ? "border-pitch" : "border-stone-200"
+            }`}
+          >
+            <svg viewBox="-3.5 -3.5 7 7" className="h-6 w-6">
+              <ConeMarker shape={c.shape} fill={activeFill} />
+            </svg>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
   const numberRow = (
     isActive: (n: number) => boolean,
     onPick: (n: number) => void,
@@ -1461,9 +1507,11 @@ export default function BoardEditorPage() {
   // The single top options row — selection first, else the active place tool.
   let optionsRow: React.ReactNode = null;
   if (selectedToken?.type === "cone") {
-    optionsRow = colourRow(
+    optionsRow = coneRow(
       selectedToken.color ?? CONE_COLORS[0].fill,
-      (fill) => recolorSelectedCone(fill)
+      (fill) => recolorSelectedCone(fill),
+      selectedToken.shape ?? "triangle",
+      (shape) => reshapeSelectedCone(shape)
     );
   } else if (selectedToken?.type === "player") {
     const st = selectedToken;
@@ -1500,7 +1548,12 @@ export default function BoardEditorPage() {
       </div>
     );
   } else if (mode.kind === "place" && mode.token === "cone") {
-    optionsRow = colourRow(coneColor, (fill) => setConeColor(fill));
+    optionsRow = coneRow(
+      coneColor,
+      (fill) => setConeColor(fill),
+      coneShape,
+      (shape) => setConeShape(shape)
+    );
   } else if (mode.kind === "place" && mode.token === "player") {
     optionsRow = numberRow(
       (n) => playerNum === n,
@@ -1737,6 +1790,7 @@ export default function BoardEditorPage() {
               y: 0,
               label,
               color: mode.token === "cone" ? coneColor : undefined,
+              shape: mode.token === "cone" ? coneShape : undefined,
             }}
             scale={iconScale}
             screenDelta={screenDelta}

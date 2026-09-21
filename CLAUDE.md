@@ -117,7 +117,14 @@ Five bottom-nav tabs, components colocated by feature under `app/(tabs)/`:
    it never sits under a grip. Extras: ▶ Play
    animates tokens along their arrows (nearest token to an arrow's start
    gets paired with it), ⤴ shares the board as a PNG, cones have a colour
-   picker, players a number picker, and there's a Dad token for helpers.
+   picker and a **shape** picker (triangle cone / flat disc / square —
+   `ConeShape` on the token, drawn by `ConeMarker` in `BoardCanvas.tsx`,
+   which the picker buttons reuse so they can't drift from the board),
+   players a number picker, and there's a Dad token for helpers. The number
+   picker is **sticky**: Auto counts up from the highest on the board, but a
+   picked number stays picked until another is chosen, so the same player
+   can be put down more than once — where they start and where they end up
+   in a sequenced set play.
    Landscape layout on wide screens plus a fullscreen button. A **Rotate**
    button turns the board between portrait and landscape by hand; it
    overrides the `(min-width: 640px) and (orientation: landscape)` media
