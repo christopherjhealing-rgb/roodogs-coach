@@ -214,7 +214,17 @@ export default function BoardEditorPage() {
   // pinch-to-zoom: the visible viewBox rect (in the SVG's own coordinate
   // space), null = fitted to the whole pitch. Live pointers and pinch anchor.
   type Rect = { x: number; y: number; w: number; h: number };
-  const [zoomView, setZoomView] = useState<Rect | null>(null);
+  // Where the coach has zoomed to: x, y and width, unclamped. The height —
+  // and the clamping — are worked out at render from the frame's aspect,
+  // which follows the *element* once zoomed on a wide screen so the canvas
+  // can fill the column instead of staying a narrow board-shaped box.
+  const [zoomView, setZoomView] = useState<{
+    x: number;
+    y: number;
+    w: number;
+  } | null>(null);
+  // the svg element's height ÷ width, kept current by a ResizeObserver
+  const [elAspect, setElAspect] = useState<number | null>(null);
   // hand tool: while on, a one-finger / mouse drag moves the view instead
   // of selecting or drawing. Only meaningful when zoomed in.
   const [panMode, setPanMode] = useState(false);
@@ -572,7 +582,43 @@ export default function BoardEditorPage() {
   const baseView: Rect = landscape
     ? { x: 0, y: 0, w: H, h: PITCH_W }
     : { x: 0, y: 0, w: PITCH_W, h: H };
-  const view = zoomView ?? baseView;
+  /** Pin a frame edge inside the board; a frame bigger than the board along
+   *  an axis is centred on it instead. */
+  const clampAxis = (pos: number, size: number, total: number) =>
+    size >= total
+      ? (total - size) / 2
+      : Math.max(0, Math.min(total - size, pos));
+
+  // Zoomed on a wide screen, the canvas fills the column and the frame takes
+  // the element's shape; otherwise the frame is board-shaped.
+  const wideFrame = zoomView != null && wideScreen;
+  const frameAspect =
+    wideFrame && elAspect ? elAspect : baseView.h / baseView.w;
+  const view: Rect = (() => {
+    if (!zoomView) return baseView;
+    const w = Math.min(baseView.w, zoomView.w);
+    const h = w * frameAspect;
+    return {
+      x: clampAxis(zoomView.x, w, baseView.w),
+      y: clampAxis(zoomView.y, h, baseView.h),
+      w,
+      h,
+    };
+  })();
+
+  // keep the element's aspect current — it changes when the zoom flips the
+  // canvas between board-shaped and column-filling
+  useEffect(() => {
+    const el = svgRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver((entries) => {
+      const r = entries[0]?.contentRect;
+      if (r && r.width > 0) setElAspect(r.height / r.width);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+    // the svg is a different element in each orientation
+  }, [loaded, landscape, board?.id]);
 
   // Hit areas are sized for a cold thumb *on screen*, so they must shrink as
   // the view zooms in — otherwise a 6-unit circle that's 48px at full size
@@ -655,16 +701,14 @@ export default function BoardEditorPage() {
     const sv = pinch.current.startView;
     const scale = pinch.current.startDist / dist;
     const w = Math.max(baseView.w / MAX_ZOOM, Math.min(baseView.w, sv.w * scale));
-    const h = w * (baseView.h / baseView.w);
+    const h = w * frameAspect;
     const ax =
       sv.x + ((pinch.current.startMid.x - rect.left) / rect.width) * sv.w;
     const ay =
       sv.y + ((pinch.current.startMid.y - rect.top) / rect.height) * sv.h;
-    let x = ax - ((mid.x - rect.left) / rect.width) * w;
-    let y = ay - ((mid.y - rect.top) / rect.height) * h;
-    x = Math.max(0, Math.min(baseView.w - w, x));
-    y = Math.max(0, Math.min(baseView.h - h, y));
-    setZoomView({ x, y, w, h });
+    const x = ax - ((mid.x - rect.left) / rect.width) * w;
+    const y = ay - ((mid.y - rect.top) / rect.height) * h;
+    setZoomView({ x, y, w });
   }
 
   /**
@@ -677,23 +721,26 @@ export default function BoardEditorPage() {
     if (!svgRef.current) return;
     const rect = svgRef.current.getBoundingClientRect();
     const nw = Math.max(baseView.w / MAX_ZOOM, Math.min(baseView.w, w));
-    const nh = nw * (baseView.h / baseView.w);
+    const nh = nw * frameAspect;
     const fx = anchor ? (anchor.x - rect.left) / rect.width : 0.5;
     const fy = anchor ? (anchor.y - rect.top) / rect.height : 0.5;
     const ax = view.x + fx * view.w;
     const ay = view.y + fy * view.h;
-    const x = Math.max(0, Math.min(baseView.w - nw, ax - fx * nw));
-    const y = Math.max(0, Math.min(baseView.h - nh, ay - fy * nh));
-    // back at full size is the same thing as not being zoomed at all
-    setZoomView(nw >= baseView.w - 0.001 ? null : { x, y, w: nw, h: nh });
+    // The whole board in frame is the same thing as not being zoomed at all.
+    // A wide frame can show the full width and still have height to pan —
+    // that's a real state — but asking to go wider than full width from
+    // there means "all the way out".
+    const atFullWidth = view.w >= baseView.w - 0.001;
+    const wholeBoard =
+      (nw >= baseView.w - 0.001 && nh >= baseView.h - 0.001) ||
+      (atFullWidth && w > view.w);
+    setZoomView(wholeBoard ? null : { x: ax - fx * nw, y: ay - fy * nh, w: nw });
   }
 
   /** Slide the zoomed frame by (dx, dy) view units, kept inside the board. */
   function panBy(dx: number, dy: number) {
     if (!zoomView) return;
-    const x = Math.max(0, Math.min(baseView.w - view.w, view.x + dx));
-    const y = Math.max(0, Math.min(baseView.h - view.h, view.y + dy));
-    setZoomView({ ...view, x, y });
+    setZoomView({ x: view.x + dx, y: view.y + dy, w: view.w });
   }
 
   // Ctrl/⌘ + wheel zooms — that's the trackpad pinch gesture and the usual
@@ -827,15 +874,11 @@ export default function BoardEditorPage() {
       const rect = svgRef.current.getBoundingClientRect();
       const { start, startView } = panDrag.current;
       const k = startView.w / rect.width;
-      const x = Math.max(
-        0,
-        Math.min(baseView.w - startView.w, startView.x - (e.clientX - start.x) * k)
-      );
-      const y = Math.max(
-        0,
-        Math.min(baseView.h - startView.h, startView.y - (e.clientY - start.y) * k)
-      );
-      setZoomView({ ...startView, x, y });
+      setZoomView({
+        x: startView.x - (e.clientX - start.x) * k,
+        y: startView.y - (e.clientY - start.y) * k,
+        w: startView.w,
+      });
       return;
     }
     if (!board || playing) return;
@@ -2197,7 +2240,7 @@ export default function BoardEditorPage() {
 
   const viewBoxStr = `${view.x} ${view.y} ${view.w} ${view.h}`;
   const zoomedIn = zoomView != null && view.w < baseView.w - 0.01;
-  const zoomedOut = view.w >= baseView.w - 0.001;
+  const zoomedOut = zoomView == null;
   const zoomedMax = view.w <= baseView.w / MAX_ZOOM + 0.001;
   const zoomBtn =
     "flex h-10 w-10 items-center justify-center rounded-lg bg-black/55 text-lg font-bold text-white shadow disabled:opacity-30";
@@ -2253,7 +2296,14 @@ export default function BoardEditorPage() {
   // A portrait board is normally as wide as its column, which is right on a
   // phone. Forced into portrait on a wide screen it would run metres off the
   // bottom of the page, so there it's sized from its height instead.
-  const portraitStyle: React.CSSProperties = wideScreen
+  // zoomed on a wide screen: fill the column, whatever shape the board is
+  const fillStyle: React.CSSProperties = {
+    width: "100%",
+    height: "calc(100dvh - 150px)",
+  };
+  const portraitStyle: React.CSSProperties = wideFrame
+    ? fillStyle
+    : wideScreen
     ? {
         aspectRatio: `${PITCH_W} / ${H}`,
         height: `min(calc(100dvh - 150px), calc((100vw - ${gutterPx}px) * ${
@@ -2268,7 +2318,7 @@ export default function BoardEditorPage() {
       ref={svgRef}
       viewBox={viewBoxStr}
       className={`mx-auto touch-none select-none rounded-xl shadow-sm ${canvasCursor}`}
-      style={{
+      style={wideFrame ? fillStyle : {
         aspectRatio: `${H} / ${PITCH_W}`,
         // the second term keeps a wide, short board inside the column —
         // and on a phone turned landscape there's no sidebar to allow for

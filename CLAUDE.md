@@ -172,8 +172,18 @@ Five bottom-nav tabs, components colocated by feature under `app/(tabs)/`:
    scroll), Ctrl/⌘ + the wheel (a plain wheel is left alone so the page still
    scrolls over the board), and the `+` `-` `0` keys. All four go through one
    `zoomToWidth(w, anchor)`, which clamps to `MAX_ZOOM` and keeps the frame
-   inside the board, so they can't drift apart. Once zoomed, **moving
-   around** has as many routes: a plain wheel / two-finger scroll pans
+   inside the board, so they can't drift apart. **Zoomed on a wide screen,
+   the canvas fills the column** and the visible frame takes the element's
+   shape rather than the board's (`wideFrame` / `frameAspect`, with the
+   element's aspect tracked by a ResizeObserver) — otherwise a portrait
+   board zoomed on a desktop was a narrow magnified column with the window
+   empty either side. The stored zoom is an unclamped `{x, y, w}`; the
+   frame's height and the clamping are derived at render (`clampAxis`
+   centres a frame that's bigger than the board along an axis), so pinch,
+   wheel, keys, buttons and the hand tool all store intent and one place
+   decides what's shown. Fully zoomed out, the canvas is board-shaped again.
+   Phones are unchanged — their canvas already spans the width. Once zoomed,
+   **moving around** has as many routes: a plain wheel / two-finger scroll pans
    (only while zoomed — at full size it's left alone so the page scrolls),
    the arrow keys nudge by a tenth of the frame, a middle-button drag pans,
    two fingers still pan, and a ✋ **hand tool** appears in the zoom stack so
