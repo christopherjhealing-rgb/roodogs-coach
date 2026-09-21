@@ -56,15 +56,18 @@ function coneStroke(fill: string): string {
 }
 
 /**
- * Disc shades for repeated player numbers. The first 7 placed is solid; a
- * second 7 is lighter, a third lighter still — so a sequenced set play
- * reads start → finish at a glance. Text darkens where the disc gets too
- * pale for white.
+ * Disc shades for a player's place in a sequence. The first is the brand's
+ * deep green — darker than the old solid — and each step lightens, so a
+ * move drawn five deep still reads first → last. Text goes dark once the
+ * disc is too pale for white.
  */
 export const PLAYER_SHADES: { fill: string; stroke: string; text: string }[] = [
+  { fill: "#12332A", stroke: "#081a14", text: "#ffffff" },
   { fill: "#1E5B3C", stroke: "#12332A", text: "#ffffff" },
-  { fill: "#5A9C74", stroke: "#1E5B3C", text: "#ffffff" },
-  { fill: "#B6DCC5", stroke: "#1E5B3C", text: "#12332A" },
+  { fill: "#3E8A61", stroke: "#1E5B3C", text: "#ffffff" },
+  { fill: "#6FB38E", stroke: "#1E5B3C", text: "#12332A" },
+  { fill: "#A6D3BA", stroke: "#1E5B3C", text: "#12332A" },
+  { fill: "#D3EBDC", stroke: "#1E5B3C", text: "#12332A" },
 ];
 
 /**
@@ -88,10 +91,11 @@ export function playerRepeatIndex(
 }
 
 /**
- * Role colours for players. Red is avoided — it already means the
- * opposition and the tackle arrow. Anchor is brass (the brand's third
- * colour), jackler purple, tackler blue, and a player who's been tackled
- * goes grey: down, out of the picture.
+ * Role colours for players — bold primaries, as the coach asked, so a
+ * breakdown or a passing move reads across the paddock. Anchor green,
+ * runner blue, passer orange, catcher magenta, tackler yellow, jackler
+ * purple, been-tackled red. Red also means the opposition's discs; the
+ * coach chose it for "tackled" knowingly.
  */
 export const PLAYER_ROLES: {
   role: PlayerRole;
@@ -100,10 +104,13 @@ export const PLAYER_ROLES: {
   stroke: string;
   text: string;
 }[] = [
-  { role: "anchor", label: "Anchor", fill: "#C9A227", stroke: "#8a6d12", text: "#12332A" },
+  { role: "anchor", label: "Anchor", fill: "#22c55e", stroke: "#15803d", text: "#052e16" },
+  { role: "runner", label: "Runner", fill: "#2563eb", stroke: "#1e3a8a", text: "#ffffff" },
+  { role: "passer", label: "Passer", fill: "#f97316", stroke: "#c2410c", text: "#431407" },
+  { role: "catcher", label: "Catcher", fill: "#db2777", stroke: "#9d174d", text: "#ffffff" },
+  { role: "tackler", label: "Tackler", fill: "#eab308", stroke: "#a16207", text: "#422006" },
   { role: "jackler", label: "Jackler", fill: "#7c3aed", stroke: "#4c1d95", text: "#ffffff" },
-  { role: "tackler", label: "Tackler", fill: "#2563eb", stroke: "#1e3a8a", text: "#ffffff" },
-  { role: "tackled", label: "Been tackled", fill: "#78716c", stroke: "#44403c", text: "#ffffff" },
+  { role: "tackled", label: "Been tackled", fill: "#dc2626", stroke: "#991b1b", text: "#ffffff" },
 ];
 
 /** Pen stroke widths, in pitch units. Medium is the arrows' own weight. */
@@ -165,8 +172,8 @@ export type Surface = "pitch" | "plain";
  */
 export const GRID_STEPS_M = [0.5, 2.5, 5, 10];
 
-/** The step the grid starts on — the most common spacing in the library. */
-export const DEFAULT_GRID_STEP_M = 5;
+/** The step the grid starts on. Grid lock is on by default at this. */
+export const DEFAULT_GRID_STEP_M = 2.5;
 
 export function snapToGrid(v: number, step: number | false): number {
   return step ? Math.round(v / step) * step : v;
@@ -342,8 +349,10 @@ function TokenShape({
       // a repeated number steps down the shade ramp
       // a role sets the colour outright; otherwise repeats step down the ramp
       const role = token.role && PLAYER_ROLES.find((r) => r.role === token.role);
+      // a sequence set by hand beats the one worked out from placement order
+      const step = token.seq ?? repeat;
       const shade =
-        role ?? PLAYER_SHADES[Math.min(repeat, PLAYER_SHADES.length - 1)];
+        role ?? PLAYER_SHADES[Math.min(step, PLAYER_SHADES.length - 1)];
       // "SH" fits at full size; a three-letter label needs to come down a notch
       const fontSize = (token.label?.length ?? 0) > 2 ? 2.4 : 3.3;
       return (

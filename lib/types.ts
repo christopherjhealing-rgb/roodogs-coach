@@ -137,7 +137,14 @@ export type MovementType =
 
 /** A player's job in the phase being drawn, shown as the disc colour so a
  *  breakdown picture reads at a glance. Unset = an ordinary player. */
-export type PlayerRole = "anchor" | "jackler" | "tackler" | "tackled";
+export type PlayerRole =
+  | "anchor"
+  | "runner"
+  | "passer"
+  | "catcher"
+  | "tackler"
+  | "jackler"
+  | "tackled";
 
 /** Marker shape for a cone token: the classic upright cone, a flat disc
  *  marker, or a square. Defaults to triangle when unset. */
@@ -157,6 +164,9 @@ export interface BoardToken {
   shape?: ConeShape;
   /** Player's role in this picture; only meaningful for players. */
   role?: PlayerRole;
+  /** Explicit place in a sequence (0 = first, drawn darkest). Unset means
+   *  "work it out from placement order" — see playerRepeatIndex. */
+  seq?: number;
 }
 
 /** A movement arrow drawn on the whiteboard, start to finish. */

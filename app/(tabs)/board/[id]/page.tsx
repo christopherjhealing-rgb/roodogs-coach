@@ -25,6 +25,7 @@ import {
   MeasureGlyph,
   PEN_WIDTHS,
   PLAYER_ROLES,
+  PLAYER_SHADES,
   MovementGlyph,
   PITCH_W,
   Pitch,
@@ -150,13 +151,12 @@ export default function BoardEditorPage() {
   // null = automatic numbering (next free number); otherwise the label to
   // put on the next player — a number, or a position like "SH"
   const [playerLabel, setPlayerLabel] = useState<string | null>(null);
-  // role given to newly placed players (unset = ordinary)
-  const [playerRole, setPlayerRole] = useState<PlayerRole | undefined>();
   // pen style
   const [penColor, setPenColor] = useState(MOVEMENT_STYLE.draw.color);
   const [penWidth, setPenWidth] = useState(PEN_WIDTHS[1].width);
   // grid lock — snap placement/moves to the grid so cones line up
-  const [snap, setSnap] = useState(false);
+  // grid lock is on by default — the coach lays most things out on it
+  const [snap, setSnap] = useState(true);
   const [gridStepM, setGridStepM] = useState(DEFAULT_GRID_STEP_M);
   const [widthStr, setWidthStr] = useState("40");
   const [lengthStr, setLengthStr] = useState("56");
@@ -167,10 +167,13 @@ export default function BoardEditorPage() {
   // phone/tablet); portrait pitch otherwise. The Rotate button overrides
   // that choice — null means "follow the screen".
   const [wideScreen, setWideScreen] = useState(false);
+  // a phone or small tablet physically held sideways — the one case where the
+  // board starts landscape on its own. A desktop browser starts portrait.
+  const [sidewaysDevice, setSidewaysDevice] = useState(false);
   const [rotateTo, setRotateTo] = useState<"landscape" | "portrait" | null>(
     null
   );
-  const landscape = rotateTo ? rotateTo === "landscape" : wideScreen;
+  const landscape = rotateTo ? rotateTo === "landscape" : sidewaysDevice;
   const [fullscreen, setFullscreen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -332,15 +335,23 @@ export default function BoardEditorPage() {
     const mq = window.matchMedia(
       "(min-width: 640px) and (orientation: landscape)"
     );
+    const side = window.matchMedia(
+      "(orientation: landscape) and (max-width: 1023px)"
+    );
     const update = () => {
       setWideScreen(mq.matches);
+      setSidewaysDevice(side.matches);
       // physically turning the phone or resizing the window is a clearer
       // statement of intent than an earlier tap, so it takes the wheel back
       setRotateTo(null);
     };
     update();
     mq.addEventListener("change", update);
-    return () => mq.removeEventListener("change", update);
+    side.addEventListener("change", update);
+    return () => {
+      mq.removeEventListener("change", update);
+      side.removeEventListener("change", update);
+    };
   }, []);
 
   useEffect(() => {
@@ -459,10 +470,17 @@ export default function BoardEditorPage() {
     }));
   }
 
+  function setSelectedPlayerSeq(seq: number | undefined) {
+    const t = soleToken();
+    if (!t || t.type !== "player") return;
+    commit((b) => ({
+      tokens: b.tokens.map((x) => (x.id === t.id ? { ...x, seq } : x)),
+    }));
+  }
+
   function setSelectedPlayerRole(role: PlayerRole | undefined) {
     const t = soleToken();
     if (!t || t.type !== "player") return;
-    setPlayerRole(role);
     commit((b) => ({
       tokens: b.tokens.map((x) => (x.id === t.id ? { ...x, role } : x)),
     }));
@@ -763,7 +781,7 @@ export default function BoardEditorPage() {
       }
       const color = mode.token === "cone" ? coneColor : undefined;
       const shape = mode.token === "cone" ? coneShape : undefined;
-      const role = mode.token === "player" ? playerRole : undefined;
+
       commit((b) => ({
         tokens: [
           ...b.tokens,
@@ -775,7 +793,6 @@ export default function BoardEditorPage() {
             label,
             color,
             shape,
-            role,
           },
         ],
       }));
@@ -1400,11 +1417,12 @@ export default function BoardEditorPage() {
     />
   );
 
-  const boardSettings =
-    showSettings || snap || mode.kind === "measure" ? (
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs">
-        {snap && (
-          <>
+  // Grid lock is on by default, so its step chips are a permanent fixture —
+  // the board size and icon size stay tucked behind the Size button (or
+  // appear with the Distance tool, where the width matters), otherwise a
+  // phone loses two rows of board to controls it rarely touches.
+  const gridRow = snap ? (
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs">
             <span className="font-medium text-stone-500">Grid:</span>
             {GRID_STEPS_M.map((m) => (
               <button
@@ -1420,8 +1438,12 @@ export default function BoardEditorPage() {
                 {m} m
               </button>
             ))}
-          </>
-        )}
+    </div>
+  ) : null;
+
+  const boardSettings =
+    showSettings || mode.kind === "measure" ? (
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs">
         <span className="font-medium text-stone-500">Board:</span>
         {sizeInput(widthStr, setWidthStr, "Board width in metres", (num) =>
           persistSize(num, parseInt(lengthStr, 10))
@@ -1534,7 +1556,7 @@ export default function BoardEditorPage() {
           key={r.role}
           onClick={() => onPick(r.role)}
           aria-pressed={active === r.role}
-          className="flex min-h-[36px] items-center gap-1.5 rounded-full border px-2.5 text-xs font-semibold"
+          className="flex min-h-[32px] items-center gap-1 rounded-full border px-2 text-[11px] font-semibold"
           style={
             active === r.role
               ? { background: r.fill, color: r.text, borderColor: r.stroke }
@@ -1547,6 +1569,39 @@ export default function BoardEditorPage() {
             style={{ background: r.fill, border: `1px solid ${r.stroke}` }}
           />
           {r.label}
+        </button>
+      ))}
+    </div>
+  );
+
+  /** Where a player sits in a sequence — picks its shade by hand. */
+  const seqRow = (active: number | undefined, onPick: (seq?: number) => void) => (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <span className="text-xs font-medium text-stone-500">Sequence:</span>
+      <button
+        onClick={() => onPick(undefined)}
+        aria-pressed={active === undefined}
+        aria-label="Sequence auto"
+        className={`min-h-[36px] rounded-full border px-2.5 text-xs font-semibold ${
+          active === undefined
+            ? "border-pitch bg-pitch text-white"
+            : "border-stone-300 bg-white text-stone-600"
+        }`}
+      >
+        Auto
+      </button>
+      {PLAYER_SHADES.map((sh, i) => (
+        <button
+          key={i}
+          onClick={() => onPick(i)}
+          aria-pressed={active === i}
+          aria-label={`Sequence ${i + 1}`}
+          className={`h-9 w-9 rounded-full border-2 text-sm font-bold ${
+            active === i ? "border-pitch ring-2 ring-pitch/30" : "border-stone-200"
+          }`}
+          style={{ background: sh.fill, color: sh.text }}
+        >
+          {i + 1}
         </button>
       ))}
     </div>
@@ -1679,6 +1734,7 @@ export default function BoardEditorPage() {
           isTyped(st.label) ? st.label! : "",
           (label) => relabelSelectedPlayer(label || undefined)
         )}
+        {seqRow(st.seq, (seq) => setSelectedPlayerSeq(seq))}
         {roleRow(st.role, (role) => setSelectedPlayerRole(role))}
       </div>
     );
@@ -1741,7 +1797,6 @@ export default function BoardEditorPage() {
           isTyped(playerLabel) ? playerLabel! : "",
           (label) => setPlayerLabel(label || null)
         )}
-        {roleRow(playerRole, setPlayerRole)}
       </div>
     );
   }
@@ -1998,7 +2053,6 @@ export default function BoardEditorPage() {
               label,
               color: mode.token === "cone" ? coneColor : undefined,
               shape: mode.token === "cone" ? coneShape : undefined,
-              role: mode.token === "player" ? playerRole : undefined,
             }}
             scale={iconScale}
             screenDelta={screenDelta}
@@ -2364,6 +2418,7 @@ export default function BoardEditorPage() {
             <div data-palette className="flex flex-wrap gap-1.5">
               {paletteButtons}
             </div>
+            {gridRow}
             {boardSettings}
             {optionsRow}
             {selectionBar}
@@ -2383,6 +2438,7 @@ export default function BoardEditorPage() {
           <div data-palette className="flex flex-wrap gap-1.5">
             {paletteButtons}
           </div>
+          {gridRow}
           {boardSettings}
           {optionsRow}
           {selectionBar}

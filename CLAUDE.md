@@ -124,29 +124,36 @@ Five bottom-nav tabs, components colocated by feature under `app/(tabs)/`:
    picker is **sticky**: Auto counts up from the highest on the board, but a
    picked number stays picked until another is chosen, so the same player
    can be put down more than once — where they start and where they end up
-   in a sequenced set play. **Repeats are shaded**: the first 7 placed is
-   solid seal green, a second 7 lighter, a third lighter still (with dark
-   text once the disc is too pale for white) — `PLAYER_SHADES` and
-   `playerRepeatIndex` in `BoardCanvas.tsx`. It's derived from placement
-   order at render time and never stored on the token, so deleting the first
-   7 promotes the second to solid by itself; the ghost forecasts the shade
-   before you tap, and the list thumbnail and `AnimatedBoard` shade the same
-   way. The number row also takes a **typed label** ("Other" — up to three
+   in a sequenced set play. **Repeats are shaded** down a six-step ramp:
+   the first 7 placed is the brand's deep green, a second 7 seal green, then
+   progressively lighter (with dark text once the disc is too pale for
+   white) — `PLAYER_SHADES` and `playerRepeatIndex` in `BoardCanvas.tsx`.
+   By default it's derived from placement order at render time and not
+   stored, so deleting the first 7 promotes the second by itself; the ghost
+   forecasts the shade before you tap, and the list thumbnail and
+   `AnimatedBoard` shade the same way. A selected player also has a
+   **Sequence** row (Auto / 1–6) that sets `seq` on the token by hand, which
+   then beats the derived order — for when the placement order wasn't the
+   order of the move. The number row also takes a **typed label** ("Other" — up to three
    characters, upper-cased) so a player can be "SH" or "N8"; three-letter
    labels step the font down. Players can carry a **role** — anchor
-   (brass), jackler (purple), tackler (blue), been tackled (grey) —
-   `PlayerRole` on the token, colours in `PLAYER_ROLES`; a role's colour
-   wins over the repeat ramp, and the legend lists any role in use so the
-   board explains itself. Red is deliberately not a role colour: it already
-   means the opposition and the tackle arrow. The **pen** has its own colour
+   (bright green), runner (blue), passer (orange), catcher (magenta),
+   tackler (yellow), jackler (purple), been tackled (red) — `PlayerRole` on
+   the token, colours in `PLAYER_ROLES`, bold primaries at the coach's
+   request; a role's colour wins over the shade ramp, and the legend lists
+   any role in use so the board explains itself. Red doubles as the
+   opposition's disc colour; the coach chose it for "been tackled"
+   knowingly. The **pen** has its own colour
    (the cone palette plus its default brass) and weight (`PEN_WIDTHS`:
    thin / medium / thick), stored per stroke as `color` / `width` on the
    movement; arrows never carry either, so their house styles stay fixed.
-   Landscape layout on wide screens plus a fullscreen button. A **Rotate**
-   button turns the board between portrait and landscape by hand; it
-   overrides the `(min-width: 640px) and (orientation: landscape)` media
-   query, and an actual screen change (turning the phone, resizing the
-   window) clears the override so the device takes the wheel back. Which way
+   Landscape layout on wide screens plus a fullscreen button. The board
+   starts **portrait** everywhere except a phone or small tablet physically
+   held sideways (`(orientation: landscape) and (max-width: 1023px)`), which
+   starts landscape — a desktop browser is portrait by default at the
+   coach's request. A **Rotate** button turns it by hand; an actual screen
+   change (turning the phone, resizing the window) clears the override so
+   the device takes the wheel back. Which way
    the **board** is turned is separate from which **layout** the page uses:
    the tool sidebar follows the screen's width, so rotating a board on a
    desktop keeps the sidebar rather than dropping to the stacked phone
@@ -203,7 +210,8 @@ Five bottom-nav tabs, components colocated by feature under `app/(tabs)/`:
    `BoardCanvas.tsx` — `boardWidthM` / `boardLengthM` / `pitchHeight` /
    `iconScaleOf`, unit-tested in `app/(tabs)/board/boardSize.test.ts`.
    The Distance tool draws dimension lines labelled in metres, and grid lock
-   snaps at a selectable step (`GRID_STEPS_M`) derived from the width. With
+   snaps at a selectable step (`GRID_STEPS_M`) derived from the width. Grid
+   lock is **on by default at 2.5 m** (`DEFAULT_GRID_STEP_M`). With
    grid lock on, an arrow is straight and both ends land on the nearest grid
    point — **any** grid point (`gridPoint`), so a pass can go cone to cone
    at whatever angle the cones make. An earlier version forced the eight
