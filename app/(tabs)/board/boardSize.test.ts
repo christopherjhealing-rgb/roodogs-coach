@@ -88,8 +88,13 @@ describe("grid steps", () => {
     }
   });
 
-  it("offers ascending steps, starting at a metre", () => {
-    expect(GRID_STEPS_M[0]).toBe(1);
+  it("offers ascending steps, fine enough to land every library width", () => {
+    // 0.5 m divides 2.5 m and lands the odd channels (2 m, 3 m) exactly
+    expect(GRID_STEPS_M[0]).toBe(0.5);
+    expect(GRID_STEPS_M).toContain(2.5);
+    for (const width of [2, 3, 4, 6, 15, 20]) {
+      expect((width / GRID_STEPS_M[0]) % 1).toBe(0);
+    }
     expect([...GRID_STEPS_M].sort((a, b) => a - b)).toEqual(GRID_STEPS_M);
   });
 

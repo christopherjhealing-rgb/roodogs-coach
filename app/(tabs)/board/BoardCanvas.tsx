@@ -60,14 +60,16 @@ export type Surface = "pitch" | "plain";
  * Grid-lock steps in metres. Every step is a whole multiple of the one
  * below it, so a cone snapped on one grid still sits on an intersection of
  * every finer grid — changing the step never strands what's already down.
- * (5 deliberately sits above 1 rather than 2: 5 isn't a multiple of 2, so a
- * 1/2/5 ladder left cones between the lines the moment you switched.)
  *
- * The numbers follow the drill library, where the areas are overwhelmingly
+ * The finest step is 0.5 m rather than 1 m because 2.5 m has to sit in the
+ * ladder (it's the coach's half-channel spacing) and 2.5 isn't a whole
+ * multiple of 1. Half a metre still lands every odd width in the drill
+ * library exactly — a 3 m channel is six steps, a 2 m one four.
+ *
+ * The bigger numbers follow the library, where areas are overwhelmingly
  * multiples of 5 and 10 — 10 m (31 drills), 20 m (26), 15 m (21), 5 m (16).
- * Odd widths like a 3 m channel land exactly on the 1 m grid.
  */
-export const GRID_STEPS_M = [1, 5, 10];
+export const GRID_STEPS_M = [0.5, 2.5, 5, 10];
 
 /** The step the grid starts on — the most common spacing in the library. */
 export const DEFAULT_GRID_STEP_M = 5;
