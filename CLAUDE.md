@@ -141,9 +141,16 @@ Five bottom-nav tabs, components colocated by feature under `app/(tabs)/`:
    scroll), Ctrl/⌘ + the wheel (a plain wheel is left alone so the page still
    scrolls over the board), and the `+` `-` `0` keys. All four go through one
    `zoomToWidth(w, anchor)`, which clamps to `MAX_ZOOM` and keeps the frame
-   inside the board, so they can't drift apart. Zoom drives the SVG `viewBox`
-   rather than a CSS transform, so pointer↔pitch maths stays exact at any
-   zoom; a "Reset zoom" button appears when zoomed.
+   inside the board, so they can't drift apart. Once zoomed, **moving
+   around** has as many routes: a plain wheel / two-finger scroll pans
+   (only while zoomed — at full size it's left alone so the page scrolls),
+   the arrow keys nudge by a tenth of the frame, a middle-button drag pans,
+   two fingers still pan, and a ✋ **hand tool** appears in the zoom stack so
+   a one-finger drag pans instead of marquee-selecting; it switches itself
+   off when the zoom resets. All go through `panBy` / `panDrag` with the
+   same clamp. Zoom drives the SVG `viewBox` rather than a CSS transform,
+   so pointer↔pitch maths stays exact at any zoom; a "Reset zoom" button
+   appears when zoomed.
    A **Size** button opens a panel holding the board's real-world
    dimensions and its icon size. Boards carry a width and a length in metres
    (`widthM` default 40, `lengthM` default 1.4 × width — which reproduces the

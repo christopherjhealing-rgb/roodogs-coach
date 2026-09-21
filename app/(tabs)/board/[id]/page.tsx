@@ -211,6 +211,10 @@ export default function BoardEditorPage() {
   // space), null = fitted to the whole pitch. Live pointers and pinch anchor.
   type Rect = { x: number; y: number; w: number; h: number };
   const [zoomView, setZoomView] = useState<Rect | null>(null);
+  // hand tool: while on, a one-finger / mouse drag moves the view instead
+  // of selecting or drawing. Only meaningful when zoomed in.
+  const [panMode, setPanMode] = useState(false);
+  const panDrag = useRef<{ start: Pt; startView: Rect } | null>(null);
   const pointers = useRef<Map<number, Pt>>(new Map());
   const pinch = useRef<{
     startDist: number;
@@ -494,6 +498,13 @@ export default function BoardEditorPage() {
       } else if (e.key === "0") {
         e.preventDefault();
         setZoomView(null);
+      } else if (zoomView && e.key.startsWith("Arrow")) {
+        e.preventDefault();
+        const step = view.w * 0.1;
+        if (e.key === "ArrowLeft") panBy(-step, 0);
+        else if (e.key === "ArrowRight") panBy(step, 0);
+        else if (e.key === "ArrowUp") panBy(0, -step);
+        else if (e.key === "ArrowDown") panBy(0, step);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -521,6 +532,11 @@ export default function BoardEditorPage() {
     setZoomView(null);
     pinch.current = null;
   }, [landscape, H]);
+
+  // no zoom, nothing to pan — the hand tool has no job at full size
+  useEffect(() => {
+    if (!zoomView) setPanMode(false);
+  }, [zoomView]);
 
   /** Screen position → pitch coordinates, honouring zoom and orientation. */
   function screenToPitch(clientX: number, clientY: number): Pt {
@@ -607,19 +623,38 @@ export default function BoardEditorPage() {
     setZoomView(nw >= baseView.w - 0.001 ? null : { x, y, w: nw, h: nh });
   }
 
+  /** Slide the zoomed frame by (dx, dy) view units, kept inside the board. */
+  function panBy(dx: number, dy: number) {
+    if (!zoomView) return;
+    const x = Math.max(0, Math.min(baseView.w - view.w, view.x + dx));
+    const y = Math.max(0, Math.min(baseView.h - view.h, view.y + dy));
+    setZoomView({ ...view, x, y });
+  }
+
   // Ctrl/⌘ + wheel zooms — that's the trackpad pinch gesture and the usual
-  // desktop convention. A plain wheel is left alone so the page still
-  // scrolls with the pointer over the board.
+  // desktop convention. A plain wheel pans while zoomed in (two-finger
+  // scroll on a trackpad), and is left alone at full size so the page
+  // still scrolls with the pointer over the board.
   useEffect(() => {
     const el = svgRef.current;
     if (!el) return;
     const onWheel = (e: WheelEvent) => {
-      if (!e.ctrlKey && !e.metaKey) return;
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        zoomToWidth(view.w * Math.exp(e.deltaY * 0.002), {
+          x: e.clientX,
+          y: e.clientY,
+        });
+        return;
+      }
+      if (!zoomView) return;
       e.preventDefault();
-      zoomToWidth(view.w * Math.exp(e.deltaY * 0.002), {
-        x: e.clientX,
-        y: e.clientY,
-      });
+      const rect = el.getBoundingClientRect();
+      const k = view.w / rect.width; // px → view units
+      // shift + wheel scrolls sideways on a plain mouse
+      const dx = e.shiftKey && !e.deltaX ? e.deltaY : e.deltaX;
+      const dy = e.shiftKey && !e.deltaX ? 0 : e.deltaY;
+      panBy(dx * k, dy * k);
     };
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
@@ -629,6 +664,7 @@ export default function BoardEditorPage() {
   function onCanvasPointerCancel(e: React.PointerEvent) {
     pointers.current.delete(e.pointerId);
     if (pointers.current.size < 2) pinch.current = null;
+    panDrag.current = null;
   }
 
   function nextAutoNumber(tokens: BoardToken[]): number {
@@ -649,6 +685,16 @@ export default function BoardEditorPage() {
     // two fingers → pinch-zoom, cancelling any one-finger action
     if (pointers.current.size >= 2) {
       beginPinch();
+      return;
+    }
+    // the hand tool, or a middle-button drag on a mouse, moves the view
+    if ((panMode || e.button === 1) && zoomView) {
+      e.preventDefault();
+      panDrag.current = {
+        start: { x: e.clientX, y: e.clientY },
+        startView: view,
+      };
+      svgRef.current?.setPointerCapture(e.pointerId);
       return;
     }
     const p = toPitch(e);
@@ -706,6 +752,21 @@ export default function BoardEditorPage() {
       pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pinch.current && pointers.current.size >= 2) {
       applyPinch();
+      return;
+    }
+    if (panDrag.current && svgRef.current) {
+      const rect = svgRef.current.getBoundingClientRect();
+      const { start, startView } = panDrag.current;
+      const k = startView.w / rect.width;
+      const x = Math.max(
+        0,
+        Math.min(baseView.w - startView.w, startView.x - (e.clientX - start.x) * k)
+      );
+      const y = Math.max(
+        0,
+        Math.min(baseView.h - startView.h, startView.y - (e.clientY - start.y) * k)
+      );
+      setZoomView({ ...startView, x, y });
       return;
     }
     if (!board || playing) return;
@@ -819,6 +880,10 @@ export default function BoardEditorPage() {
     // finishing (or breaking) a pinch — don't fall through to draw/select
     if (pinch.current) {
       if (pointers.current.size < 2) pinch.current = null;
+      return;
+    }
+    if (panDrag.current) {
+      panDrag.current = null;
       return;
     }
     if (resize.current) {
@@ -1779,8 +1844,9 @@ export default function BoardEditorPage() {
     </>
   );
 
-  const canvasCursor =
-    mode.kind === "place" || mode.kind === "draw" || mode.kind === "measure"
+  const canvasCursor = panMode
+    ? "cursor-grab active:cursor-grabbing"
+    : mode.kind === "place" || mode.kind === "draw" || mode.kind === "measure"
       ? "cursor-crosshair"
       : "";
 
@@ -1814,12 +1880,23 @@ export default function BoardEditorPage() {
         −
       </button>
       {zoomedIn && (
-        <button
-          onClick={() => setZoomView(null)}
-          className="rounded-lg bg-black/55 px-2.5 py-1 text-xs font-semibold text-white shadow"
-        >
-          Reset zoom
-        </button>
+        <>
+          <button
+            onClick={() => setPanMode((v) => !v)}
+            aria-pressed={panMode}
+            aria-label="Move around the board"
+            title="Drag to move around (or scroll, arrow keys, middle-button drag, two fingers)"
+            className={`${zoomBtn} ${panMode ? "!bg-pitch" : ""}`}
+          >
+            ✋
+          </button>
+          <button
+            onClick={() => setZoomView(null)}
+            className="rounded-lg bg-black/55 px-2.5 py-1 text-xs font-semibold text-white shadow"
+          >
+            Reset zoom
+          </button>
+        </>
       )}
     </div>
   );
