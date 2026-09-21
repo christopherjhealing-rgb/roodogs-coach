@@ -162,8 +162,14 @@ Five bottom-nav tabs, components colocated by feature under `app/(tabs)/`:
    never silently re-derives the other. **Shortening a board never deletes
    anything** — icons past the new end just aren't drawn, and the panel says
    how many and that nothing was lost. `iconScale` (XS/S/M/L chips) shrinks or
-   grows every token on the board without moving it; tap targets never shrink
-   below the standard size. All three live on `Board` and are applied at every
+   grows every token on the board without moving it; a smaller icon keeps the
+   full-size tap target. **Hit areas are sized for a thumb on screen, not in
+   pitch units** — `tokenHitR` / `lineHitW` in the editor shrink as the view
+   zooms in (6 units at full size, floored at the drawn glyph), because a
+   fixed 6-unit circle that's 48px at full size is 290px at 6× and swallows
+   the gap between two cones on a 5 m grid (12.5 units apart). So zooming in
+   is exactly how you place a player between cones; at full size the
+   thumb-friendly slop is unchanged. All three live on `Board` and are applied at every
    render site (editor, `BoardPreview`, `AnimatedBoard`) via the helpers in
    `BoardCanvas.tsx` — `boardWidthM` / `boardLengthM` / `pitchHeight` /
    `iconScaleOf`, unit-tested in `app/(tabs)/board/boardSize.test.ts`.

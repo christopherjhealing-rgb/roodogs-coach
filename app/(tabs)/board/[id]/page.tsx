@@ -527,6 +527,18 @@ export default function BoardEditorPage() {
     : { x: 0, y: 0, w: PITCH_W, h: H };
   const view = zoomView ?? baseView;
 
+  // Hit areas are sized for a cold thumb *on screen*, so they must shrink as
+  // the view zooms in — otherwise a 6-unit circle that's 48px at full size
+  // is 290px at 6×, and swallows the gap between two cones 12.5 units apart.
+  // Floored at the drawn glyph, so an icon is always at least as easy to hit
+  // as it is to see.
+  const zoomFactor = baseView.w / view.w;
+  const tokenHitR = Math.max(
+    4.5 * iconScale,
+    Math.max(6, 6 * iconScale) / zoomFactor
+  );
+  const lineHitW = Math.max(3, 7 / zoomFactor);
+
   // reset the zoom whenever the orientation flips (their view boxes differ)
   useEffect(() => {
     setZoomView(null);
@@ -1696,7 +1708,7 @@ export default function BoardEditorPage() {
   let ghost: React.ReactNode = null;
   if (mode.kind === "place" && hoverPos && !playing) {
     const overExisting = board.tokens.some(
-      (t) => Math.hypot(t.x - hoverPos.x, t.y - hoverPos.y) <= 6
+      (t) => Math.hypot(t.x - hoverPos.x, t.y - hoverPos.y) <= tokenHitR
     );
     if (!overExisting) {
       const gx = snapToGrid(hoverPos.x, snapStep);
@@ -1760,6 +1772,7 @@ export default function BoardEditorPage() {
         <MovementGlyph
           key={m.id}
           movement={m}
+          hitWidth={lineHitW}
           onPointerDown={(e) => onMovementPointerDown(e, m)}
         />
       ))}
@@ -1769,6 +1782,7 @@ export default function BoardEditorPage() {
           measure={ms}
           widthM={widthM}
           screenDelta={screenDelta}
+          hitWidth={lineHitW}
           onPointerDown={(e) => onMeasurePointerDown(e, ms)}
         />
       ))}
@@ -1823,12 +1837,12 @@ export default function BoardEditorPage() {
           >
             {/* generous invisible hit area for cold thumbs — never shrinks
                 below the standard size, however small the icons are drawn */}
-            <circle r={Math.max(6, 6 * iconScale)} fill="transparent" />
+            <circle r={tokenHitR} fill="transparent" />
             <TokenGlyph token={t} scale={iconScale} screenDelta={screenDelta} />
             {/* mouse-only hover ring (see globals.css) */}
             <circle
               className="hover-ring"
-              r={Math.max(5.2, 5.2 * iconScale)}
+              r={tokenHitR * 0.87}
               fill="none"
               stroke="#1E5B3C"
               strokeWidth={0.5}

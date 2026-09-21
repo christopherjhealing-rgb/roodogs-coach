@@ -380,10 +380,13 @@ function arrowHeadPoints(
 export function MovementGlyph({
   movement,
   preview = false,
+  hitWidth = 7,
   onPointerDown,
 }: {
   movement: BoardMovement;
   preview?: boolean;
+  /** Width of the invisible grab stroke; the editor shrinks it as it zooms. */
+  hitWidth?: number;
   onPointerDown?: (e: React.PointerEvent) => void;
 }) {
   const pts = movement.points;
@@ -432,7 +435,7 @@ export function MovementGlyph({
           d={d}
           fill="none"
           stroke="transparent"
-          strokeWidth={7}
+          strokeWidth={hitWidth}
           style={{ cursor: "pointer" }}
           onPointerDown={onPointerDown}
         />
@@ -480,12 +483,15 @@ export function MeasureGlyph({
   widthM = 40,
   screenDelta = 0,
   preview = false,
+  hitWidth = 7,
   onPointerDown,
 }: {
   measure: { a: { x: number; y: number }; b: { x: number; y: number } };
   widthM?: number;
   screenDelta?: number;
   preview?: boolean;
+  /** Width of the invisible grab stroke; the editor shrinks it as it zooms. */
+  hitWidth?: number;
   onPointerDown?: (e: React.PointerEvent) => void;
 }) {
   const { a, b } = measure;
@@ -514,7 +520,7 @@ export function MeasureGlyph({
           x2={b.x}
           y2={b.y}
           stroke="transparent"
-          strokeWidth={7}
+          strokeWidth={hitWidth}
           style={{ cursor: "pointer" }}
           onPointerDown={onPointerDown}
         />
