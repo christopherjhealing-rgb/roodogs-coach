@@ -3,12 +3,14 @@ import {
   DEFAULT_GRID_STEP_M,
   DEFAULT_WIDTH_M,
   GRID_STEPS_M,
+  PLAYER_SHADES,
   PITCH_H,
   PITCH_W,
   boardLengthM,
   boardWidthM,
   iconScaleOf,
   pitchHeight,
+  playerRepeatIndex,
 } from "./BoardCanvas";
 
 describe("board size", () => {
@@ -100,5 +102,49 @@ describe("grid steps", () => {
 
   it("starts on a step it actually offers", () => {
     expect(GRID_STEPS_M).toContain(DEFAULT_GRID_STEP_M);
+  });
+});
+
+describe("playerRepeatIndex", () => {
+  const tk = (id: string, type: "player" | "cone", label?: string) =>
+    ({ id, type, x: 0, y: 0, label }) as const;
+
+  it("numbers repeats of the same player in placement order", () => {
+    const m = playerRepeatIndex([
+      tk("a", "player", "7"),
+      tk("b", "player", "8"),
+      tk("c", "player", "7"),
+      tk("d", "player", "7"),
+    ]);
+    expect(m.get("a")).toBe(0);
+    expect(m.get("b")).toBe(0);
+    expect(m.get("c")).toBe(1);
+    expect(m.get("d")).toBe(2);
+  });
+
+  it("promotes the next one when the first is gone — nothing is stored", () => {
+    const m = playerRepeatIndex([tk("c", "player", "7"), tk("d", "player", "7")]);
+    expect(m.get("c")).toBe(0);
+    expect(m.get("d")).toBe(1);
+  });
+
+  it("ignores cones and unnumbered players", () => {
+    const m = playerRepeatIndex([
+      tk("k", "cone"),
+      tk("p", "player"),
+      tk("q", "player"),
+      tk("r", "player", "3"),
+    ]);
+    expect(m.has("k")).toBe(false);
+    expect(m.has("p")).toBe(false);
+    expect(m.get("r")).toBe(0);
+  });
+
+  it("never runs past the end of the shade ramp", () => {
+    const many = Array.from({ length: 6 }, (_, i) => tk(`t${i}`, "player", "1"));
+    const m = playerRepeatIndex(many);
+    // the glyph clamps to the last shade; the index itself just counts
+    expect(m.get("t5")).toBe(5);
+    expect(PLAYER_SHADES.length).toBeGreaterThanOrEqual(3);
   });
 });

@@ -33,6 +33,7 @@ import {
   iconScaleOf,
   pathLengthUnits,
   pitchHeight,
+  playerRepeatIndex,
   snapToGrid,
   surfaceFor,
 } from "../BoardCanvas";
@@ -1776,6 +1777,11 @@ export default function BoardEditorPage() {
         mode.token === "player"
           ? String(playerNum ?? nextAutoNumber(board.tokens))
           : undefined;
+      // show the shade this placement will land with (a second 7 is lighter)
+      const ghostRepeat = label
+        ? board.tokens.filter((t) => t.type === "player" && t.label === label)
+            .length
+        : 0;
       ghost = (
         <g
           opacity={0.45}
@@ -1794,6 +1800,7 @@ export default function BoardEditorPage() {
             }}
             scale={iconScale}
             screenDelta={screenDelta}
+            repeat={ghostRepeat}
           />
         </g>
       );
@@ -1824,6 +1831,9 @@ export default function BoardEditorPage() {
         pointerEvents="none"
       />
     ) : null;
+
+  // repeated player numbers step down the shade ramp, in placement order
+  const repeats = playerRepeatIndex(board.tokens);
 
   const boardContent = (
     <>
@@ -1898,7 +1908,12 @@ export default function BoardEditorPage() {
             {/* generous invisible hit area for cold thumbs — never shrinks
                 below the standard size, however small the icons are drawn */}
             <circle r={tokenHitR} fill="transparent" />
-            <TokenGlyph token={t} scale={iconScale} screenDelta={screenDelta} />
+            <TokenGlyph
+              token={t}
+              scale={iconScale}
+              screenDelta={screenDelta}
+              repeat={repeats.get(t.id) ?? 0}
+            />
             {/* mouse-only hover ring (see globals.css) */}
             <circle
               className="hover-ring"

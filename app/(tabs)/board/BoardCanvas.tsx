@@ -54,6 +54,38 @@ function coneStroke(fill: string): string {
   return CONE_COLORS.find((c) => c.fill === fill)?.stroke ?? "#ea580c";
 }
 
+/**
+ * Disc shades for repeated player numbers. The first 7 placed is solid; a
+ * second 7 is lighter, a third lighter still — so a sequenced set play
+ * reads start → finish at a glance. Text darkens where the disc gets too
+ * pale for white.
+ */
+export const PLAYER_SHADES: { fill: string; stroke: string; text: string }[] = [
+  { fill: "#1E5B3C", stroke: "#12332A", text: "#ffffff" },
+  { fill: "#5A9C74", stroke: "#1E5B3C", text: "#ffffff" },
+  { fill: "#B6DCC5", stroke: "#1E5B3C", text: "#12332A" },
+];
+
+/**
+ * Which repeat each numbered player is, in placement order: the first token
+ * with a given number is 0, the next with the same number 1, and so on.
+ * Derived, never stored, so deleting the first 7 promotes the second to
+ * solid on its own. Unnumbered players and other token types are skipped.
+ */
+export function playerRepeatIndex(
+  tokens: readonly BoardToken[]
+): Map<string, number> {
+  const seen = new Map<string, number>();
+  const out = new Map<string, number>();
+  for (const t of tokens) {
+    if (t.type !== "player" || !t.label) continue;
+    const k = seen.get(t.label) ?? 0;
+    out.set(t.id, k);
+    seen.set(t.label, k + 1);
+  }
+  return out;
+}
+
 /** The marker shapes a cone can take, in picker order. */
 export const CONE_SHAPES: { shape: ConeShape; label: string }[] = [
   { shape: "triangle", label: "Cone" },
@@ -240,12 +272,17 @@ export function TokenGlyph({
   token,
   scale = 1,
   screenDelta = 0,
+  repeat = 0,
 }: {
   token: BoardToken;
   scale?: number;
   screenDelta?: number;
+  /** Which repeat of this player number it is (see playerRepeatIndex). */
+  repeat?: number;
 }) {
-  const shape = <TokenShape token={token} screenDelta={screenDelta} />;
+  const shape = (
+    <TokenShape token={token} screenDelta={screenDelta} repeat={repeat} />
+  );
   return scale === 1 ? shape : <g transform={`scale(${scale})`}>{shape}</g>;
 }
 
@@ -266,16 +303,21 @@ function Upright({
 function TokenShape({
   token,
   screenDelta = 0,
+  repeat = 0,
 }: {
   token: BoardToken;
   screenDelta?: number;
+  repeat?: number;
 }) {
   switch (token.type) {
-    case "player":
-      // seal-green disc with a white number — matches the drill attackers
+    case "player": {
+      // seal-green disc with a white number — matches the drill attackers;
+      // a repeated number steps down the shade ramp
+      const shade =
+        PLAYER_SHADES[Math.min(repeat, PLAYER_SHADES.length - 1)];
       return (
         <g>
-          <circle r={3.4} fill="#1E5B3C" stroke="#12332A" strokeWidth={0.5} />
+          <circle r={3.4} fill={shade.fill} stroke={shade.stroke} strokeWidth={0.5} />
           {token.label && (
             <Upright screenDelta={screenDelta}>
               <text
@@ -283,7 +325,7 @@ function TokenShape({
                 dy={1.2}
                 fontSize={3.3}
                 fontWeight={700}
-                fill="#ffffff"
+                fill={shade.text}
               >
                 {token.label}
               </text>
@@ -291,6 +333,7 @@ function TokenShape({
           )}
         </g>
       );
+    }
     case "opponent":
       // red disc — matches the drill defenders
       return (
@@ -608,11 +651,18 @@ export function BoardPreview({
       {(board.measures ?? []).map((ms) => (
         <MeasureGlyph key={ms.id} measure={ms} widthM={boardWidthM(board)} />
       ))}
-      {board.tokens.map((t) => (
-        <g key={t.id} transform={`translate(${t.x} ${t.y})`}>
-          <TokenGlyph token={t} scale={iconScaleOf(board)} />
-        </g>
-      ))}
+      {(() => {
+        const repeats = playerRepeatIndex(board.tokens);
+        return board.tokens.map((t) => (
+          <g key={t.id} transform={`translate(${t.x} ${t.y})`}>
+            <TokenGlyph
+              token={t}
+              scale={iconScaleOf(board)}
+              repeat={repeats.get(t.id) ?? 0}
+            />
+          </g>
+        ));
+      })()}
     </svg>
   );
 }

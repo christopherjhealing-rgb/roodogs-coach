@@ -124,7 +124,14 @@ Five bottom-nav tabs, components colocated by feature under `app/(tabs)/`:
    picker is **sticky**: Auto counts up from the highest on the board, but a
    picked number stays picked until another is chosen, so the same player
    can be put down more than once — where they start and where they end up
-   in a sequenced set play.
+   in a sequenced set play. **Repeats are shaded**: the first 7 placed is
+   solid seal green, a second 7 lighter, a third lighter still (with dark
+   text once the disc is too pale for white) — `PLAYER_SHADES` and
+   `playerRepeatIndex` in `BoardCanvas.tsx`. It's derived from placement
+   order at render time and never stored on the token, so deleting the first
+   7 promotes the second to solid by itself; the ghost forecasts the shade
+   before you tap, and the list thumbnail and `AnimatedBoard` shade the same
+   way.
    Landscape layout on wide screens plus a fullscreen button. A **Rotate**
    button turns the board between portrait and landscape by hand; it
    overrides the `(min-width: 640px) and (orientation: landscape)` media

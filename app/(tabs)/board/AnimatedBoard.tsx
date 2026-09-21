@@ -11,6 +11,7 @@ import {
   boardWidthM,
   iconScaleOf,
   pitchHeight,
+  playerRepeatIndex,
   surfaceFor,
 } from "./BoardCanvas";
 import { canPlay as boardCanPlay, runSequentialPlay } from "./boardPlay";
@@ -47,6 +48,7 @@ export default function AnimatedBoard({
   const canPlay = boardCanPlay(board);
   const h = pitchHeight(board);
   const iconScale = iconScaleOf(board);
+  const repeats = playerRepeatIndex(board.tokens);
 
   return (
     <div className={`relative ${className}`}>
@@ -67,7 +69,11 @@ export default function AnimatedBoard({
           const pos = anim?.get(t.id) ?? t;
           return (
             <g key={t.id} transform={`translate(${pos.x} ${pos.y})`}>
-              <TokenGlyph token={t} scale={iconScale} />
+              <TokenGlyph
+                token={t}
+                scale={iconScale}
+                repeat={repeats.get(t.id) ?? 0}
+              />
             </g>
           );
         })}
