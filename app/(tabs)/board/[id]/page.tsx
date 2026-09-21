@@ -533,10 +533,16 @@ export default function BoardEditorPage() {
   // Floored at the drawn glyph, so an icon is always at least as easy to hit
   // as it is to see.
   const zoomFactor = baseView.w / view.w;
-  const tokenHitR = Math.max(
+  const grabHitR = Math.max(
     4.5 * iconScale,
     Math.max(6, 6 * iconScale) / zoomFactor
   );
+  // With a placing tool the intent is to put something down, so an icon
+  // only claims a tap that lands on the icon itself (plus a hair). The
+  // generous thumb catchment is for grabbing in Move/Erase — on a 5 m grid
+  // it would otherwise leave no gap at all to drop a player between cones.
+  const placeHitR = 3.6 * iconScale;
+  const tokenHitR = mode.kind === "place" ? placeHitR : grabHitR;
   const lineHitW = Math.max(3, 7 / zoomFactor);
 
   // reset the zoom whenever the orientation flips (their view boxes differ)
