@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  DEFAULT_GRID_STEP_M,
   DEFAULT_WIDTH_M,
+  GRID_STEPS_M,
   PITCH_H,
   PITCH_W,
   boardLengthM,
@@ -58,5 +60,40 @@ describe("iconScaleOf", () => {
   it("clamps to a usable range", () => {
     expect(iconScaleOf({ iconScale: 0.01 })).toBe(0.3);
     expect(iconScaleOf({ iconScale: 99 })).toBe(2);
+  });
+});
+
+describe("grid steps", () => {
+  it("are a nested ladder — each a whole multiple of the one below", () => {
+    for (let i = 1; i < GRID_STEPS_M.length; i++) {
+      const ratio = GRID_STEPS_M[i] / GRID_STEPS_M[i - 1];
+      expect(
+        Number.isInteger(ratio),
+        `${GRID_STEPS_M[i]}m is not a whole multiple of ${GRID_STEPS_M[i - 1]}m`
+      ).toBe(true);
+    }
+  });
+
+  it("keeps a cone snapped on any step sitting on every finer step", () => {
+    // this is the property the ladder exists for: change the grid and what
+    // is already down stays on an intersection
+    for (let coarse = 0; coarse < GRID_STEPS_M.length; coarse++) {
+      const step = GRID_STEPS_M[coarse];
+      for (const n of [0, 1, 2, 7, 13]) {
+        const placed = n * step;
+        for (let fine = 0; fine <= coarse; fine++) {
+          expect(placed % GRID_STEPS_M[fine]).toBeCloseTo(0, 9);
+        }
+      }
+    }
+  });
+
+  it("offers ascending steps, starting at a metre", () => {
+    expect(GRID_STEPS_M[0]).toBe(1);
+    expect([...GRID_STEPS_M].sort((a, b) => a - b)).toEqual(GRID_STEPS_M);
+  });
+
+  it("starts on a step it actually offers", () => {
+    expect(GRID_STEPS_M).toContain(DEFAULT_GRID_STEP_M);
   });
 });

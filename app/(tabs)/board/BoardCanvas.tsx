@@ -56,6 +56,22 @@ function coneStroke(fill: string): string {
 export type Surface = "pitch" | "plain";
 
 /** Snap v to a grid of the given step (pitch units); falsy step = no snap. */
+/**
+ * Grid-lock steps in metres. Every step is a whole multiple of the one
+ * below it, so a cone snapped on one grid still sits on an intersection of
+ * every finer grid — changing the step never strands what's already down.
+ * (5 deliberately sits above 1 rather than 2: 5 isn't a multiple of 2, so a
+ * 1/2/5 ladder left cones between the lines the moment you switched.)
+ *
+ * The numbers follow the drill library, where the areas are overwhelmingly
+ * multiples of 5 and 10 — 10 m (31 drills), 20 m (26), 15 m (21), 5 m (16).
+ * Odd widths like a 3 m channel land exactly on the 1 m grid.
+ */
+export const GRID_STEPS_M = [1, 5, 10];
+
+/** The step the grid starts on — the most common spacing in the library. */
+export const DEFAULT_GRID_STEP_M = 5;
+
 export function snapToGrid(v: number, step: number | false): number {
   return step ? Math.round(v / step) * step : v;
 }

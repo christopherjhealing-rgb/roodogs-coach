@@ -15,6 +15,8 @@ import type {
 } from "@/lib/types";
 import {
   CONE_COLORS,
+  DEFAULT_GRID_STEP_M,
+  GRID_STEPS_M,
   MOVEMENT_STYLE,
   MeasureGlyph,
   MovementGlyph,
@@ -91,7 +93,11 @@ const MOVEMENT_TYPES: MovementType[] = [
 ];
 
 const PLAYER_NUMBERS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
-const GRID_STEPS_M = [1, 2, 5];
+
+/** Tightest the frame can close in, as a multiple of the whole board. */
+const MAX_ZOOM = 6;
+/** How much one tap of the zoom buttons changes the frame. */
+const ZOOM_STEP = 1.4;
 
 /** Token size presets. 1 is the size the board has always drawn at. */
 const ICON_SIZES: { label: string; scale: number }[] = [
@@ -150,7 +156,7 @@ export default function BoardEditorPage() {
   const [playerNum, setPlayerNum] = useState<number | null>(null);
   // grid lock — snap placement/moves to the grid so cones line up
   const [snap, setSnap] = useState(false);
-  const [gridStepM, setGridStepM] = useState(2);
+  const [gridStepM, setGridStepM] = useState(DEFAULT_GRID_STEP_M);
   const [widthStr, setWidthStr] = useState("40");
   const [lengthStr, setLengthStr] = useState("56");
   // the board size / icon size panel, opened from the "Size" button
@@ -479,6 +485,15 @@ export default function BoardEditorPage() {
         undo();
       } else if (e.key === "Escape") {
         setSelected(null);
+      } else if (e.key === "+" || e.key === "=") {
+        e.preventDefault();
+        zoomToWidth(view.w / ZOOM_STEP);
+      } else if (e.key === "-" || e.key === "_") {
+        e.preventDefault();
+        zoomToWidth(view.w * ZOOM_STEP);
+      } else if (e.key === "0") {
+        e.preventDefault();
+        setZoomView(null);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -558,7 +573,7 @@ export default function BoardEditorPage() {
     const { dist, mid } = pinchGeom();
     const sv = pinch.current.startView;
     const scale = pinch.current.startDist / dist;
-    const w = Math.max(baseView.w / 4, Math.min(baseView.w, sv.w * scale));
+    const w = Math.max(baseView.w / MAX_ZOOM, Math.min(baseView.w, sv.w * scale));
     const h = w * (baseView.h / baseView.w);
     const ax =
       sv.x + ((pinch.current.startMid.x - rect.left) / rect.width) * sv.w;
@@ -570,6 +585,46 @@ export default function BoardEditorPage() {
     y = Math.max(0, Math.min(baseView.h - h, y));
     setZoomView({ x, y, w, h });
   }
+
+  /**
+   * Zoom so the frame is `w` units across, keeping whatever sits under
+   * `anchor` (screen px, default the middle of the canvas) where it is.
+   * Shared by the zoom buttons, the wheel and the pinch so all three clamp
+   * the same way.
+   */
+  function zoomToWidth(w: number, anchor?: Pt) {
+    if (!svgRef.current) return;
+    const rect = svgRef.current.getBoundingClientRect();
+    const nw = Math.max(baseView.w / MAX_ZOOM, Math.min(baseView.w, w));
+    const nh = nw * (baseView.h / baseView.w);
+    const fx = anchor ? (anchor.x - rect.left) / rect.width : 0.5;
+    const fy = anchor ? (anchor.y - rect.top) / rect.height : 0.5;
+    const ax = view.x + fx * view.w;
+    const ay = view.y + fy * view.h;
+    const x = Math.max(0, Math.min(baseView.w - nw, ax - fx * nw));
+    const y = Math.max(0, Math.min(baseView.h - nh, ay - fy * nh));
+    // back at full size is the same thing as not being zoomed at all
+    setZoomView(nw >= baseView.w - 0.001 ? null : { x, y, w: nw, h: nh });
+  }
+
+  // Ctrl/⌘ + wheel zooms — that's the trackpad pinch gesture and the usual
+  // desktop convention. A plain wheel is left alone so the page still
+  // scrolls with the pointer over the board.
+  useEffect(() => {
+    const el = svgRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return;
+      e.preventDefault();
+      zoomToWidth(view.w * Math.exp(e.deltaY * 0.002), {
+        x: e.clientX,
+        y: e.clientY,
+      });
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+    // rebinds each render so it closes over the current view
+  });
 
   function onCanvasPointerCancel(e: React.PointerEvent) {
     pointers.current.delete(e.pointerId);
@@ -1731,14 +1786,43 @@ export default function BoardEditorPage() {
 
   const viewBoxStr = `${view.x} ${view.y} ${view.w} ${view.h}`;
   const zoomedIn = zoomView != null && view.w < baseView.w - 0.01;
-  const zoomResetBtn = zoomedIn ? (
-    <button
-      onClick={() => setZoomView(null)}
-      className="absolute bottom-2 right-2 z-10 rounded-lg bg-black/60 px-2.5 py-1 text-xs font-semibold text-white shadow"
-    >
-      Reset zoom
-    </button>
-  ) : null;
+  const zoomedOut = view.w >= baseView.w - 0.001;
+  const zoomedMax = view.w <= baseView.w / MAX_ZOOM + 0.001;
+  const zoomBtn =
+    "flex h-10 w-10 items-center justify-center rounded-lg bg-black/55 text-lg font-bold text-white shadow disabled:opacity-30";
+  const zoomControls = (
+    // top-right, not bottom: the foot of a tall board sits under the fixed
+    // nav until you scroll, and zoom controls you have to go looking for
+    // are no use
+    <div className="absolute right-2 top-2 z-10 flex flex-col items-end gap-1">
+      <button
+        onClick={() => zoomToWidth(view.w / ZOOM_STEP)}
+        disabled={zoomedMax}
+        aria-label="Zoom in"
+        title="Zoom in (+, or Ctrl and the wheel)"
+        className={zoomBtn}
+      >
+        +
+      </button>
+      <button
+        onClick={() => zoomToWidth(view.w * ZOOM_STEP)}
+        disabled={zoomedOut}
+        aria-label="Zoom out"
+        title="Zoom out (−)"
+        className={zoomBtn}
+      >
+        −
+      </button>
+      {zoomedIn && (
+        <button
+          onClick={() => setZoomView(null)}
+          className="rounded-lg bg-black/55 px-2.5 py-1 text-xs font-semibold text-white shadow"
+        >
+          Reset zoom
+        </button>
+      )}
+    </div>
+  );
 
   // How much of the window's width the canvas can have: a wide screen also
   // carries the 240px tool sidebar, a phone stacks the tools above instead.
@@ -1803,7 +1887,7 @@ export default function BoardEditorPage() {
   const canvas = (
     <div className="relative">
       {svgEl}
-      {zoomResetBtn}
+      {zoomControls}
     </div>
   );
 

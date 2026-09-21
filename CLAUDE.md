@@ -135,9 +135,15 @@ Five bottom-nav tabs, components colocated by feature under `app/(tabs)/`:
    `BoardCanvas.tsx`. The palette
    collapses into **People / Equipment / Arrows** dropdowns (each with a stable
    `aria-label`) so the whole toolbar fits a phone without sideways scrolling;
-   Move, Distance and Erase stay as direct buttons. **Two-finger pinch** zooms
-   and pans the pitch (implemented by driving the SVG `viewBox`, so pointer↔pitch
-   maths stays exact at any zoom; a "Reset zoom" button appears when zoomed).
+   Move, Distance and Erase stay as direct buttons. **Zoom** has four ways in:
+   two-finger pinch, the +/− buttons at the canvas's top-right (top, not
+   bottom — the foot of a tall board sits under the fixed nav until you
+   scroll), Ctrl/⌘ + the wheel (a plain wheel is left alone so the page still
+   scrolls over the board), and the `+` `-` `0` keys. All four go through one
+   `zoomToWidth(w, anchor)`, which clamps to `MAX_ZOOM` and keeps the frame
+   inside the board, so they can't drift apart. Zoom drives the SVG `viewBox`
+   rather than a CSS transform, so pointer↔pitch maths stays exact at any
+   zoom; a "Reset zoom" button appears when zoomed.
    A **Size** button opens a panel holding the board's real-world
    dimensions and its icon size. Boards carry a width and a length in metres
    (`widthM` default 40, `lengthM` default 1.4 × width — which reproduces the
@@ -155,7 +161,19 @@ Five bottom-nav tabs, components colocated by feature under `app/(tabs)/`:
    `BoardCanvas.tsx` — `boardWidthM` / `boardLengthM` / `pitchHeight` /
    `iconScaleOf`, unit-tested in `app/(tabs)/board/boardSize.test.ts`.
    The Distance tool draws dimension lines labelled in metres, and grid lock
-   snaps at a selectable 1/2/5 m step derived from the width. In Move mode a drag
+   snaps at a selectable step (`GRID_STEPS_M`) derived from the width.
+   Those steps are a **nested ladder — 1 / 5 / 10 m, each a whole multiple of
+   the one below** — so a cone snapped on one grid still sits on an
+   intersection of every finer grid and changing the step never strands what
+   is already down. (Coarsening can still leave a cone between lines — 25 m
+   is not on a 10 m grid — which no ladder can avoid.) 5 deliberately sits
+   above 1 rather than 2, because the old 1/2/5 ladder broke the moment you
+   went from 2 to 5. The numbers follow the drill library, where areas are
+   overwhelmingly multiples of 5 and 10 (10 m ×31, 20 m ×26, 15 m ×21,
+   5 m ×16, but 2 m only ×1); odd widths like a 3 m channel land exactly on
+   the 1 m grid. The ladder's nesting is asserted in
+   `app/(tabs)/board/boardSize.test.ts`, so a future edit can't quietly
+   break it. In Move mode a drag
    over empty pitch marquee-selects several tokens (drag any one to move
    the group). Keyboard: Delete removes the selection, Ctrl/Cmd+Z undoes,
    Escape deselects. Hovering with a mouse shows a ghost of the tool
