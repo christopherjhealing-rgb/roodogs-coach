@@ -194,7 +194,11 @@ Five bottom-nav tabs, components colocated by feature under `app/(tabs)/`:
    claims a tap that lands on the icon itself (`placeHitR` = 3.6 × iconScale)
    — otherwise on a 5 m grid (cones 12.5 units apart) two 6-unit catchments
    left no gap to drop a player between. `lineHitW` shrinks with zoom the
-   same way. All three live on `Board` and are applied at every
+   same way. When catchments overlap — discs touching in a column — the tap
+   goes to the **nearest centre** (`nearestTokenTo`), not to whichever token
+   SVG drew last; and the selected item's delete × is placed in the first of
+   several candidate spots that isn't on top of another icon, so it can't
+   swallow a tap meant for a neighbour. All three live on `Board` and are applied at every
    render site (editor, `BoardPreview`, `AnimatedBoard`) via the helpers in
    `BoardCanvas.tsx` — `boardWidthM` / `boardLengthM` / `pitchHeight` /
    `iconScaleOf`, unit-tested in `app/(tabs)/board/boardSize.test.ts`.

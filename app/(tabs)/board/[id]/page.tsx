@@ -1082,8 +1082,29 @@ export default function BoardEditorPage() {
       : single;
   }
 
-  function onTokenPointerDown(e: React.PointerEvent, token: BoardToken) {
+  /**
+   * The token the coach meant. SVG hit-testing hands us whichever token was
+   * drawn last among those whose catchment the tap is inside — in a tight
+   * cluster that's usually a neighbour. Re-resolve to the nearest centre.
+   */
+  function nearestTokenTo(p: Pt, fallback: BoardToken): BoardToken {
+    if (!board) return fallback;
+    let best = fallback;
+    let bestD = Infinity;
+    for (const t of board.tokens) {
+      const pos = animPositions?.get(t.id) ?? t;
+      const dd = Math.hypot(pos.x - p.x, pos.y - p.y);
+      if (dd <= tokenHitR && dd < bestD) {
+        best = t;
+        bestD = dd;
+      }
+    }
+    return best;
+  }
+
+  function onTokenPointerDown(e: React.PointerEvent, hit: BoardToken) {
     if (playing || !board) return;
+    const token = nearestTokenTo(toPitch(e), hit);
     // Tapping an existing icon always selects it (so you can move or delete
     // it) — in Move mode and in any Place tool. Only Draw lets the tap fall
     // through, so you can still draw an arrow starting from a player.
@@ -1880,7 +1901,22 @@ export default function BoardEditorPage() {
     if (one) {
       if (selTk.length === 1) {
         const pos = animPositions?.get(selTk[0].id) ?? selTk[0];
-        deleteAt = { x: pos.x + 7, y: pos.y - 7 };
+        // put the × in the first spot that isn't on top of another icon,
+        // so in a tight cluster it can't swallow a tap meant for a neighbour
+        const others = board.tokens
+          .filter((t) => t.id !== selTk[0].id)
+          .map((t) => animPositions?.get(t.id) ?? t);
+        const spots = [
+          { x: 7, y: -7 }, { x: -7, y: -7 }, { x: 7, y: 7 }, { x: -7, y: 7 },
+          { x: 10, y: 0 }, { x: -10, y: 0 }, { x: 0, y: -10 }, { x: 0, y: 10 },
+          { x: 11, y: -11 }, { x: -11, y: -11 }, { x: 11, y: 11 }, { x: -11, y: 11 },
+        ];
+        const clear = spots.find((o) =>
+          others.every(
+            (q) => Math.hypot(q.x - (pos.x + o.x), q.y - (pos.y + o.y)) > 7
+          )
+        ) ?? spots[0];
+        deleteAt = { x: pos.x + clear.x, y: pos.y + clear.y };
       } else if (selMv.length === 1 && selMv[0].points.length > 0) {
         // offset square to the arrow, so it never lands on the line itself
         // or on the grab handles now sitting at either end
