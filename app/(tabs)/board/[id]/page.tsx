@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { EraseIcon, MoveIcon } from "@/components/NavIcon";
 import { newId, storage } from "@/lib/storage";
 import type {
   Board,
@@ -13,19 +12,13 @@ import type {
   ConeShape,
   MovementType,
   PlayerRole,
-  TokenType,
 } from "@/lib/types";
 import {
   CONE_COLORS,
-  CONE_SHAPES,
-  ConeMarker,
   DEFAULT_GRID_STEP_M,
-  GRID_STEPS_M,
   MOVEMENT_STYLE,
   MeasureGlyph,
   PEN_WIDTHS,
-  PLAYER_ROLES,
-  PLAYER_SHADES,
   MovementGlyph,
   PITCH_W,
   Pitch,
@@ -48,95 +41,34 @@ import {
   resizePath,
 } from "@/lib/boardGeometry";
 
-/** How close a tap has to land to an arrow, in pitch units, to count as
- *  "on" it while a drawing tool is active. The arrow's hit band is much
- *  fatter than this so it's easy to grab in Move mode; in Draw mode we want
- *  a near miss to start a new arrow rather than grab the old one. */
-const DRAW_MODE_GRAB_UNITS = 2.5;
-
-type Mode =
-  | { kind: "move" }
-  | { kind: "erase" }
-  | { kind: "measure" }
-  | { kind: "place"; token: TokenType }
-  | { kind: "draw"; movement: MovementType };
-
-/** Unified selection — any mix of tokens, arrows and distance markers. */
-interface Selection {
-  tokens: string[];
-  movements: string[];
-  measures: string[];
-}
-
-const selTokens = (ids: string[]): Selection => ({
-  tokens: ids,
-  movements: [],
-  measures: [],
-});
-const selMovements = (ids: string[]): Selection => ({
-  tokens: [],
-  movements: ids,
-  measures: [],
-});
-const selMeasures = (ids: string[]): Selection => ({
-  tokens: [],
-  movements: [],
-  measures: ids,
-});
-const selCount = (s: Selection | null): number =>
-  s ? s.tokens.length + s.movements.length + s.measures.length : 0;
-
-// Toolbar groups — collapsed into dropdowns so the whole palette fits on a
-// phone without sideways scrolling.
-const PEOPLE_TOKENS: TokenType[] = ["player", "opponent", "dad"];
-const EQUIP_TOKENS: TokenType[] = ["cone", "hurdle", "bag", "pad", "ball"];
-
-const MOVEMENT_TYPES: MovementType[] = [
-  "run",
-  "pass",
-  "kick",
-  "tackle",
-  "jump",
-  "draw",
-];
-
-const PLAYER_NUMBERS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
-
-/** Tightest the frame can close in, as a multiple of the whole board. */
-const MAX_ZOOM = 6;
-/** How much one tap of the zoom buttons changes the frame. */
-const ZOOM_STEP = 1.4;
-
-/** Token size presets. 1 is the size the board has always drawn at. */
-const ICON_SIZES: { label: string; scale: number }[] = [
-  { label: "XS", scale: 0.55 },
-  { label: "S", scale: 0.75 },
-  { label: "M", scale: 1 },
-  { label: "L", scale: 1.3 },
-];
-
-interface Snapshot {
-  tokens: BoardToken[];
-  movements: BoardMovement[];
-  measures: BoardMeasure[];
-  // the board's shape and icon size are undoable too
-  widthM?: number;
-  lengthM?: number;
-  iconScale?: number;
-}
-
-type Pt = { x: number; y: number };
-
-/** With grid lock on, an arrow's end lands on the nearest grid point —
- *  any grid point, so a pass can go cone to cone at whatever angle the
- *  cones make. (An earlier version forced the eight compass directions,
- *  which looked tidy and stopped exactly that.) */
-function gridPoint(p: Pt, step: number, h: number): Pt {
-  return {
-    x: Math.min(PITCH_W, Math.max(0, snapToGrid(p.x, step))),
-    y: Math.min(h, Math.max(0, snapToGrid(p.y, step))),
-  };
-}
+import {
+  type Mode,
+  type Selection,
+  type Snapshot,
+  type Pt,
+  DRAW_MODE_GRAB_UNITS,
+  selTokens,
+  selMovements,
+  selMeasures,
+  selCount,
+  MOVEMENT_TYPES,
+  PLAYER_NUMBERS,
+  MAX_ZOOM,
+  ZOOM_STEP,
+  gridPoint,
+} from "../_editor/editorConstants";
+import {
+  coneRow,
+  roleRow,
+  seqRow,
+  numberRow,
+  penRow,
+} from "../_editor/OptionRows";
+import Palette, { type MenuId } from "../_editor/Palette";
+import BoardSettings from "../_editor/BoardSettings";
+import { useBoardZoom } from "../_editor/useBoardZoom";
+import ZoomControls from "../_editor/ZoomControls";
+import BoardLegend from "../_editor/BoardLegend";
 
 export default function BoardEditorPage() {
   const params = useParams<{ id: string }>();
@@ -146,9 +78,7 @@ export default function BoardEditorPage() {
   const [loaded, setLoaded] = useState(false);
   const [mode, setMode] = useState<Mode>({ kind: "move" });
   // which palette dropdown is open (People / Equipment / Arrows), if any
-  const [openMenu, setOpenMenu] = useState<
-    "people" | "equipment" | "arrows" | null
-  >(null);
+  const [openMenu, setOpenMenu] = useState<MenuId | null>(null);
   const [undoStack, setUndoStack] = useState<Snapshot[]>([]);
   const [coneColor, setConeColor] = useState(CONE_COLORS[0].fill);
   const [coneShape, setConeShape] = useState<ConeShape>("triangle");
@@ -234,31 +164,6 @@ export default function BoardEditorPage() {
   // marquee rectangle drag in Move mode
   const marqueeStart = useRef<Pt | null>(null);
   const [marquee, setMarquee] = useState<{ a: Pt; b: Pt } | null>(null);
-
-  // pinch-to-zoom: the visible viewBox rect (in the SVG's own coordinate
-  // space), null = fitted to the whole pitch. Live pointers and pinch anchor.
-  type Rect = { x: number; y: number; w: number; h: number };
-  // Where the coach has zoomed to: x, y and width, unclamped. The height —
-  // and the clamping — are worked out at render from the frame's aspect,
-  // which follows the *element* once zoomed on a wide screen so the canvas
-  // can fill the column instead of staying a narrow board-shaped box.
-  const [zoomView, setZoomView] = useState<{
-    x: number;
-    y: number;
-    w: number;
-  } | null>(null);
-  // the svg element's height ÷ width, kept current by a ResizeObserver
-  const [elAspect, setElAspect] = useState<number | null>(null);
-  // hand tool: while on, a one-finger / mouse drag moves the view instead
-  // of selecting or drawing. Only meaningful when zoomed in.
-  const [panMode, setPanMode] = useState(false);
-  const panDrag = useRef<{ start: Pt; startView: Rect } | null>(null);
-  const pointers = useRef<Map<number, Pt>>(new Map());
-  const pinch = useRef<{
-    startDist: number;
-    startMid: Pt;
-    startView: Rect;
-  } | null>(null);
 
   // mouse hover position on the pitch — drives the ghost preview in place
   // mode (never set for touch, so phones are unaffected)
@@ -634,48 +539,31 @@ export default function BoardEditorPage() {
   // how far the board is turned on screen; lettering is spun back by this
   const screenDelta = landscape ? -90 : 0;
 
-  // The SVG viewBox when fully zoomed out — pitch space in portrait, the
-  // rotated space in landscape.
-  const baseView: Rect = landscape
-    ? { x: 0, y: 0, w: H, h: PITCH_W }
-    : { x: 0, y: 0, w: PITCH_W, h: H };
-  /** Pin a frame edge inside the board; a frame bigger than the board along
-   *  an axis is centred on it instead. */
-  const clampAxis = (pos: number, size: number, total: number) =>
-    size >= total
-      ? (total - size) / 2
-      : Math.max(0, Math.min(total - size, pos));
-
-  // Zoomed on a wide screen, the canvas fills the column and the frame takes
-  // the element's shape; otherwise the frame is board-shaped.
-  const wideFrame = zoomView != null && wideScreen;
-  const frameAspect =
-    wideFrame && elAspect ? elAspect : baseView.h / baseView.w;
-  const view: Rect = (() => {
-    if (!zoomView) return baseView;
-    const w = Math.min(baseView.w, zoomView.w);
-    const h = w * frameAspect;
-    return {
-      x: clampAxis(zoomView.x, w, baseView.w),
-      y: clampAxis(zoomView.y, h, baseView.h),
-      w,
-      h,
-    };
-  })();
-
-  // keep the element's aspect current — it changes when the zoom flips the
-  // canvas between board-shaped and column-filling
-  useEffect(() => {
-    const el = svgRef.current;
-    if (!el || typeof ResizeObserver === "undefined") return;
-    const ro = new ResizeObserver((entries) => {
-      const r = entries[0]?.contentRect;
-      if (r && r.width > 0) setElAspect(r.height / r.width);
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-    // the svg is a different element in each orientation
-  }, [loaded, landscape, board?.id]);
+  const {
+    baseView,
+    view,
+    zoomView,
+    setZoomView,
+    wideFrame,
+    panMode,
+    setPanMode,
+    panDrag,
+    pointers,
+    pinch,
+    startPinch,
+    applyPinch,
+    zoomToWidth,
+    panBy,
+    startPanDrag,
+    applyPanDrag,
+  } = useBoardZoom({
+    svgRef,
+    landscape,
+    wideScreen,
+    H,
+    loaded,
+    boardId: board?.id,
+  });
 
   // Hit areas are sized for a cold thumb *on screen*, so they must shrink as
   // the view zooms in — otherwise a 6-unit circle that's 48px at full size
@@ -694,17 +582,6 @@ export default function BoardEditorPage() {
   const placeHitR = 3.6 * iconScale;
   const tokenHitR = mode.kind === "place" ? placeHitR : grabHitR;
   const lineHitW = Math.max(3, 7 / zoomFactor);
-
-  // reset the zoom whenever the orientation flips (their view boxes differ)
-  useEffect(() => {
-    setZoomView(null);
-    pinch.current = null;
-  }, [landscape, H]);
-
-  // no zoom, nothing to pan — the hand tool has no job at full size
-  useEffect(() => {
-    if (!zoomView) setPanMode(false);
-  }, [zoomView]);
 
   /** Screen position → pitch coordinates, honouring zoom and orientation. */
   function screenToPitch(clientX: number, clientY: number): Pt {
@@ -725,16 +602,6 @@ export default function BoardEditorPage() {
     return screenToPitch(e.clientX, e.clientY);
   }
 
-  /** Distance and midpoint (screen px) of the two active pointers. */
-  function pinchGeom() {
-    const pts = [...pointers.current.values()];
-    const [a, b] = pts;
-    return {
-      dist: Math.hypot(a.x - b.x, a.y - b.y) || 1,
-      mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 },
-    };
-  }
-
   /** A second finger landed — abandon any one-finger action and start a pinch. */
   function beginPinch() {
     drawPoints.current = [];
@@ -745,90 +612,8 @@ export default function BoardEditorPage() {
     setMeasurePreview(null);
     drag.current = null;
     dragUndoTaken.current = false;
-    const { dist, mid } = pinchGeom();
-    pinch.current = { startDist: dist, startMid: mid, startView: view };
+    startPinch();
   }
-
-  /** Update the zoom rect from the live pinch — scale about the midpoint and
-   *  pan with it, clamped so the pitch always fills the frame. */
-  function applyPinch() {
-    if (!pinch.current || !svgRef.current) return;
-    const rect = svgRef.current.getBoundingClientRect();
-    const { dist, mid } = pinchGeom();
-    const sv = pinch.current.startView;
-    const scale = pinch.current.startDist / dist;
-    const w = Math.max(baseView.w / MAX_ZOOM, Math.min(baseView.w, sv.w * scale));
-    const h = w * frameAspect;
-    const ax =
-      sv.x + ((pinch.current.startMid.x - rect.left) / rect.width) * sv.w;
-    const ay =
-      sv.y + ((pinch.current.startMid.y - rect.top) / rect.height) * sv.h;
-    const x = ax - ((mid.x - rect.left) / rect.width) * w;
-    const y = ay - ((mid.y - rect.top) / rect.height) * h;
-    setZoomView({ x, y, w });
-  }
-
-  /**
-   * Zoom so the frame is `w` units across, keeping whatever sits under
-   * `anchor` (screen px, default the middle of the canvas) where it is.
-   * Shared by the zoom buttons, the wheel and the pinch so all three clamp
-   * the same way.
-   */
-  function zoomToWidth(w: number, anchor?: Pt) {
-    if (!svgRef.current) return;
-    const rect = svgRef.current.getBoundingClientRect();
-    const nw = Math.max(baseView.w / MAX_ZOOM, Math.min(baseView.w, w));
-    const nh = nw * frameAspect;
-    const fx = anchor ? (anchor.x - rect.left) / rect.width : 0.5;
-    const fy = anchor ? (anchor.y - rect.top) / rect.height : 0.5;
-    const ax = view.x + fx * view.w;
-    const ay = view.y + fy * view.h;
-    // The whole board in frame is the same thing as not being zoomed at all.
-    // A wide frame can show the full width and still have height to pan —
-    // that's a real state — but asking to go wider than full width from
-    // there means "all the way out".
-    const atFullWidth = view.w >= baseView.w - 0.001;
-    const wholeBoard =
-      (nw >= baseView.w - 0.001 && nh >= baseView.h - 0.001) ||
-      (atFullWidth && w > view.w);
-    setZoomView(wholeBoard ? null : { x: ax - fx * nw, y: ay - fy * nh, w: nw });
-  }
-
-  /** Slide the zoomed frame by (dx, dy) view units, kept inside the board. */
-  function panBy(dx: number, dy: number) {
-    if (!zoomView) return;
-    setZoomView({ x: view.x + dx, y: view.y + dy, w: view.w });
-  }
-
-  // Ctrl/⌘ + wheel zooms — that's the trackpad pinch gesture and the usual
-  // desktop convention. A plain wheel pans while zoomed in (two-finger
-  // scroll on a trackpad), and is left alone at full size so the page
-  // still scrolls with the pointer over the board.
-  useEffect(() => {
-    const el = svgRef.current;
-    if (!el) return;
-    const onWheel = (e: WheelEvent) => {
-      if (e.ctrlKey || e.metaKey) {
-        e.preventDefault();
-        zoomToWidth(view.w * Math.exp(e.deltaY * 0.002), {
-          x: e.clientX,
-          y: e.clientY,
-        });
-        return;
-      }
-      if (!zoomView) return;
-      e.preventDefault();
-      const rect = el.getBoundingClientRect();
-      const k = view.w / rect.width; // px → view units
-      // shift + wheel scrolls sideways on a plain mouse
-      const dx = e.shiftKey && !e.deltaX ? e.deltaY : e.deltaX;
-      const dy = e.shiftKey && !e.deltaX ? 0 : e.deltaY;
-      panBy(dx * k, dy * k);
-    };
-    el.addEventListener("wheel", onWheel, { passive: false });
-    return () => el.removeEventListener("wheel", onWheel);
-    // rebinds each render so it closes over the current view
-  });
 
   function onCanvasPointerCancel(e: React.PointerEvent) {
     pointers.current.delete(e.pointerId);
@@ -863,10 +648,7 @@ export default function BoardEditorPage() {
     // the hand tool, or a middle-button drag on a mouse, moves the view
     if ((panMode || e.button === 1) && zoomView) {
       e.preventDefault();
-      panDrag.current = {
-        start: { x: e.clientX, y: e.clientY },
-        startView: view,
-      };
+      startPanDrag(e.clientX, e.clientY);
       svgRef.current?.setPointerCapture(e.pointerId);
       return;
     }
@@ -931,17 +713,7 @@ export default function BoardEditorPage() {
       applyPinch();
       return;
     }
-    if (panDrag.current && svgRef.current) {
-      const rect = svgRef.current.getBoundingClientRect();
-      const { start, startView } = panDrag.current;
-      const k = startView.w / rect.width;
-      setZoomView({
-        x: startView.x - (e.clientX - start.x) * k,
-        y: startView.y - (e.clientY - start.y) * k,
-        w: startView.w,
-      });
-      return;
-    }
+    if (applyPanDrag(e.clientX, e.clientY)) return;
     if (!board || playing) return;
     const p = toPitch(e);
     // ghost preview follows the mouse in place mode
@@ -1301,194 +1073,6 @@ export default function BoardEditorPage() {
     );
   }
 
-  const toolChip = (active: boolean) =>
-    `flex min-h-[48px] min-w-[52px] flex-col items-center justify-center gap-0.5 rounded-lg border px-1.5 text-[10px] font-medium ${
-      active
-        ? "border-pitch bg-pitch text-white"
-        : "border-stone-300 bg-white text-stone-600"
-    }`;
-
-  const tokenIcon = (t: TokenType) => (
-    <svg viewBox="-5 -5 10 10" className="h-5 w-5">
-      <TokenGlyph token={{ id: "icon", type: t, x: 0, y: 0, label: "1" }} />
-    </svg>
-  );
-
-  const movementIcon = (m: MovementType) => (
-    <svg viewBox="0 0 24 12" className="h-5 w-6 rounded bg-stone-100 ring-1 ring-stone-200">
-      {m === "draw" ? (
-        <path
-          d="M3 8 Q7 2 11 7 T19 6"
-          fill="none"
-          stroke={MOVEMENT_STYLE[m].color}
-          strokeWidth={2}
-          strokeLinecap="round"
-        />
-      ) : (
-        <>
-          <line
-            x1={3}
-            y1={6}
-            x2={17}
-            y2={6}
-            stroke={MOVEMENT_STYLE[m].color}
-            strokeWidth={2}
-            strokeDasharray={MOVEMENT_STYLE[m].dash
-              ?.split(" ")
-              .map((n) => Number(n) * 1.8)
-              .join(" ")}
-          />
-          <polygon points="21,6 16,3.5 16,8.5" fill={MOVEMENT_STYLE[m].color} />
-        </>
-      )}
-    </svg>
-  );
-
-  // Which tool each dropdown currently holds (drives its label + highlight).
-  const activePerson =
-    mode.kind === "place" && PEOPLE_TOKENS.includes(mode.token)
-      ? mode.token
-      : null;
-  const activeEquip =
-    mode.kind === "place" && EQUIP_TOKENS.includes(mode.token)
-      ? mode.token
-      : null;
-  const activeArrow = mode.kind === "draw" ? mode.movement : null;
-
-  const caret = (
-    <svg viewBox="0 0 10 6" className="h-1.5 w-2.5" aria-hidden>
-      <path d="M1 1 L5 5 L9 1" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-
-  // A palette dropdown: trigger chip + a panel of tool options below it.
-  const dropdown = (
-    id: "people" | "equipment" | "arrows",
-    ariaLabel: string,
-    fallbackLabel: string,
-    triggerIcon: React.ReactNode,
-    active: boolean,
-    options: React.ReactNode
-  ) => (
-    <div className="relative">
-      <button
-        onClick={() => setOpenMenu((v) => (v === id ? null : id))}
-        aria-expanded={openMenu === id}
-        aria-label={ariaLabel}
-        className={toolChip(active)}
-      >
-        {triggerIcon}
-        <span className="flex items-center gap-0.5">
-          {fallbackLabel}
-          {caret}
-        </span>
-      </button>
-      {openMenu === id && (
-        <div className="absolute left-0 top-full z-30 mt-1 grid w-[172px] grid-cols-3 gap-1 rounded-xl border border-stone-200 bg-white p-1.5 shadow-lg">
-          {options}
-        </div>
-      )}
-    </div>
-  );
-
-  const placeOption = (t: TokenType) => (
-    <button
-      key={t}
-      onClick={() => {
-        setMode({ kind: "place", token: t });
-        setOpenMenu(null);
-      }}
-      className={toolChip(mode.kind === "place" && mode.token === t)}
-    >
-      {tokenIcon(t)}
-      {TOKEN_LABELS[t]}
-    </button>
-  );
-
-  const arrowOption = (m: MovementType) => (
-    <button
-      key={m}
-      onClick={() => {
-        setMode({ kind: "draw", movement: m });
-        setOpenMenu(null);
-      }}
-      className={toolChip(mode.kind === "draw" && mode.movement === m)}
-    >
-      {movementIcon(m)}
-      {MOVEMENT_STYLE[m].label}
-    </button>
-  );
-
-  const paletteButtons = (
-    <>
-      <button
-        onClick={() => {
-          setMode({ kind: "move" });
-          setOpenMenu(null);
-        }}
-        className={toolChip(mode.kind === "move")}
-      >
-        <MoveIcon className="h-5 w-5" />
-        Move
-      </button>
-
-      {dropdown(
-        "people",
-        "People tools",
-        activePerson ? TOKEN_LABELS[activePerson] : "People",
-        tokenIcon(activePerson ?? "player"),
-        activePerson != null,
-        PEOPLE_TOKENS.map(placeOption)
-      )}
-
-      {dropdown(
-        "equipment",
-        "Equipment tools",
-        activeEquip ? TOKEN_LABELS[activeEquip] : "Equipment",
-        tokenIcon(activeEquip ?? "cone"),
-        activeEquip != null,
-        EQUIP_TOKENS.map(placeOption)
-      )}
-
-      {dropdown(
-        "arrows",
-        "Arrow tools",
-        activeArrow ? MOVEMENT_STYLE[activeArrow].label : "Arrows",
-        movementIcon(activeArrow ?? "run"),
-        activeArrow != null,
-        MOVEMENT_TYPES.map(arrowOption)
-      )}
-
-      <button
-        onClick={() => {
-          setMode({ kind: "measure" });
-          setOpenMenu(null);
-        }}
-        className={toolChip(mode.kind === "measure")}
-      >
-        <svg viewBox="0 0 24 12" className="h-5 w-6">
-          <line x1={3} y1={6} x2={21} y2={6} stroke="currentColor" strokeWidth={1.6} />
-          <line x1={3} y1={2.5} x2={3} y2={9.5} stroke="currentColor" strokeWidth={1.6} />
-          <line x1={21} y1={2.5} x2={21} y2={9.5} stroke="currentColor" strokeWidth={1.6} />
-          <line x1={9} y1={4.5} x2={9} y2={7.5} stroke="currentColor" strokeWidth={1.2} />
-          <line x1={15} y1={4.5} x2={15} y2={7.5} stroke="currentColor" strokeWidth={1.2} />
-        </svg>
-        Distance
-      </button>
-
-      <button
-        onClick={() => {
-          setMode({ kind: "erase" });
-          setOpenMenu(null);
-        }}
-        className={toolChip(mode.kind === "erase")}
-      >
-        <EraseIcon className="h-5 w-5" />
-        Erase
-      </button>
-    </>
-  );
-
   // shortening a board never deletes anything — icons simply sit past the
   // end until it's made longer again
   const offBoard = board ? board.tokens.filter((t) => t.y > H).length : 0;
@@ -1508,295 +1092,24 @@ export default function BoardEditorPage() {
     persist({ ...board, widthM: w, lengthM: l });
   }
 
-  const sizeInput = (
-    value: string,
-    setValue: (v: string) => void,
-    label: string,
-    apply: (n: number) => void
-  ) => (
-    <input
-      inputMode="numeric"
-      value={value}
-      onFocus={() => {
+  const settingsPanel = (
+    <BoardSettings
+      snap={snap}
+      gridStepM={gridStepM}
+      onGridStep={setGridStepM}
+      showSizePanel={showSettings || mode.kind === "measure"}
+      widthStr={widthStr}
+      lengthStr={lengthStr}
+      setWidthStr={setWidthStr}
+      setLengthStr={setLengthStr}
+      onSize={persistSize}
+      onSizeFocus={() => {
         sizeUndoTaken.current = false;
       }}
-      onChange={(e) => {
-        const v = e.target.value.replace(/\D/g, "").slice(0, 3);
-        setValue(v);
-        const num = parseInt(v, 10);
-        if (Number.isFinite(num)) apply(num);
-      }}
-      aria-label={label}
-      className="min-h-[36px] w-14 rounded-lg border border-stone-300 px-2 text-center text-sm outline-none focus:border-pitch"
+      iconScale={iconScale}
+      onIconScale={(scale) => commit(() => ({ iconScale: scale }))}
+      offBoard={offBoard}
     />
-  );
-
-  // Grid lock is on by default, so its step chips are a permanent fixture —
-  // the board size and icon size stay tucked behind the Size button (or
-  // appear with the Distance tool, where the width matters), otherwise a
-  // phone loses two rows of board to controls it rarely touches.
-  const gridRow = snap ? (
-    <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs">
-            <span className="font-medium text-stone-500">Grid:</span>
-            {GRID_STEPS_M.map((m) => (
-              <button
-                key={m}
-                onClick={() => setGridStepM(m)}
-                aria-pressed={gridStepM === m}
-                className={`min-h-[36px] rounded-full border px-2.5 font-semibold ${
-                  gridStepM === m
-                    ? "border-pitch bg-pitch text-white"
-                    : "border-stone-300 bg-white text-stone-600"
-                }`}
-              >
-                {m} m
-              </button>
-            ))}
-    </div>
-  ) : null;
-
-  const boardSettings =
-    showSettings || mode.kind === "measure" ? (
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-xs">
-        <span className="font-medium text-stone-500">Board:</span>
-        {sizeInput(widthStr, setWidthStr, "Board width in metres", (num) =>
-          persistSize(num, parseInt(lengthStr, 10))
-        )}
-        <span className="text-stone-500">m wide ×</span>
-        {sizeInput(lengthStr, setLengthStr, "Board length in metres", (num) =>
-          persistSize(parseInt(widthStr, 10), num)
-        )}
-        <span className="text-stone-500">m long</span>
-        <span className="pl-1 font-medium text-stone-500">Icons:</span>
-        {ICON_SIZES.map((sz) => (
-          <button
-            key={sz.label}
-            onClick={() => commit(() => ({ iconScale: sz.scale }))}
-            aria-pressed={iconScale === sz.scale}
-            aria-label={`${sz.label} icons`}
-            className={`min-h-[36px] rounded-full border px-2.5 font-semibold ${
-              iconScale === sz.scale
-                ? "border-pitch bg-pitch text-white"
-                : "border-stone-300 bg-white text-stone-600"
-            }`}
-          >
-            {sz.label}
-          </button>
-        ))}
-        {offBoard > 0 && (
-          <span className="basis-full font-medium text-amber-700">
-            {offBoard} {offBoard === 1 ? "icon sits" : "icons sit"} past the end
-            — lengthen the board to bring{" "}
-            {offBoard === 1 ? "it" : "them"} back. Nothing has been deleted.
-          </span>
-        )}
-      </div>
-    ) : null;
-
-  // Shared option rows. There's a single row at the top of the toolbar: it
-  // edits the selected item when there is one, otherwise it sets the default
-  // for the active place tool — so a colour/number picker never appears twice.
-  const colourRow = (activeFill: string, onPick: (fill: string) => void) => (
-    <div className="flex flex-wrap items-center gap-1.5">
-      <span className="text-xs font-medium text-stone-500">Colour:</span>
-      {CONE_COLORS.map((c) => (
-        <button
-          key={c.fill}
-          onClick={() => onPick(c.fill)}
-          aria-label={`${c.name} cone`}
-          aria-pressed={activeFill === c.fill}
-          className={`h-9 w-9 rounded-full border-2 ${
-            activeFill === c.fill ? "border-pitch" : "border-stone-200"
-          }`}
-          style={{ backgroundColor: c.fill }}
-        />
-      ))}
-    </div>
-  );
-
-  /** Colour swatches plus the three marker shapes, drawn in that colour. */
-  const coneRow = (
-    activeFill: string,
-    onFill: (fill: string) => void,
-    activeShape: ConeShape,
-    onShape: (shape: ConeShape) => void
-  ) => (
-    <div className="flex flex-wrap items-center gap-y-1.5">
-      {colourRow(activeFill, onFill)}
-      <div className="flex items-center gap-1.5 pl-2">
-        <span className="text-xs font-medium text-stone-500">Shape:</span>
-        {CONE_SHAPES.map((c) => (
-          <button
-            key={c.shape}
-            onClick={() => onShape(c.shape)}
-            aria-label={`${c.label} shape`}
-            aria-pressed={activeShape === c.shape}
-            className={`flex h-9 w-9 items-center justify-center rounded-full border-2 bg-white ${
-              activeShape === c.shape ? "border-pitch" : "border-stone-200"
-            }`}
-          >
-            <svg viewBox="-3.5 -3.5 7 7" className="h-6 w-6">
-              <ConeMarker shape={c.shape} fill={activeFill} />
-            </svg>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-
-  const roleRow = (
-    active: PlayerRole | undefined,
-    onPick: (role: PlayerRole | undefined) => void
-  ) => (
-    <div className="flex flex-wrap items-center gap-1.5">
-      <span className="text-xs font-medium text-stone-500">Role:</span>
-      <button
-        onClick={() => onPick(undefined)}
-        aria-pressed={!active}
-        className={`min-h-[36px] rounded-full border px-2.5 text-xs font-semibold ${
-          !active
-            ? "border-pitch bg-pitch text-white"
-            : "border-stone-300 bg-white text-stone-600"
-        }`}
-      >
-        No role
-      </button>
-      {PLAYER_ROLES.map((r) => (
-        <button
-          key={r.role}
-          onClick={() => onPick(r.role)}
-          aria-pressed={active === r.role}
-          className="flex min-h-[32px] items-center gap-1 rounded-full border px-2 text-[11px] font-semibold"
-          style={
-            active === r.role
-              ? { background: r.fill, color: r.text, borderColor: r.stroke }
-              : { borderColor: "#d6d3d1", background: "#fff", color: "#57534e" }
-          }
-        >
-          <span
-            aria-hidden
-            className="inline-block h-3 w-3 rounded-full"
-            style={{ background: r.fill, border: `1px solid ${r.stroke}` }}
-          />
-          {r.label}
-        </button>
-      ))}
-    </div>
-  );
-
-  /** Where a player sits in a sequence — picks its shade by hand. */
-  const seqRow = (active: number | undefined, onPick: (seq?: number) => void) => (
-    <div className="flex flex-wrap items-center gap-1.5">
-      <span className="text-xs font-medium text-stone-500">Sequence:</span>
-      <button
-        onClick={() => onPick(undefined)}
-        aria-pressed={active === undefined}
-        aria-label="Sequence auto"
-        className={`min-h-[36px] rounded-full border px-2.5 text-xs font-semibold ${
-          active === undefined
-            ? "border-pitch bg-pitch text-white"
-            : "border-stone-300 bg-white text-stone-600"
-        }`}
-      >
-        Auto
-      </button>
-      {PLAYER_SHADES.map((sh, i) => (
-        <button
-          key={i}
-          onClick={() => onPick(i)}
-          aria-pressed={active === i}
-          aria-label={`Sequence ${i + 1}`}
-          className={`h-9 w-9 rounded-full border-2 text-sm font-bold ${
-            active === i ? "border-pitch ring-2 ring-pitch/30" : "border-stone-200"
-          }`}
-          style={{ background: sh.fill, color: sh.text }}
-        >
-          {i + 1}
-        </button>
-      ))}
-    </div>
-  );
-
-  const numberRow = (
-    isActive: (n: number) => boolean,
-    onPick: (n: number) => void,
-    leading: React.ReactNode,
-    typed: string,
-    onTyped: (label: string) => void
-  ) => (
-    <div className="flex flex-wrap items-center gap-1.5">
-      <span className="text-xs font-medium text-stone-500">Number:</span>
-      {leading}
-      {PLAYER_NUMBERS.map((n) => (
-        <button
-          key={n}
-          onClick={() => onPick(n)}
-          aria-pressed={isActive(n)}
-          className={`h-9 w-9 rounded-full border text-sm font-bold ${
-            isActive(n)
-              ? "border-pitch bg-pitch text-white"
-              : "border-stone-300 bg-white text-stone-600"
-          }`}
-        >
-          {n}
-        </button>
-      ))}
-      <span className="pl-1 text-xs font-medium text-stone-500">Other:</span>
-      <input
-        value={typed}
-        onChange={(e) =>
-          onTyped(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 3))
-        }
-        placeholder="SH"
-        aria-label="Other label"
-        className="h-9 w-14 rounded-lg border border-stone-300 px-2 text-center text-sm font-bold uppercase outline-none focus:border-pitch"
-      />
-    </div>
-  );
-
-  /** Colour swatches and stroke weights for the pen. */
-  const penRow = (
-    activeColor: string,
-    activeWidth: number,
-    onColor: (c: string) => void,
-    onWidth: (w: number) => void
-  ) => (
-    <div className="flex flex-wrap items-center gap-y-1.5">
-      <div className="flex flex-wrap items-center gap-1.5">
-        <span className="text-xs font-medium text-stone-500">Pen:</span>
-        {[{ fill: MOVEMENT_STYLE.draw.color, name: "Brass" }, ...CONE_COLORS].map((c) => (
-          <button
-            key={c.fill}
-            onClick={() => onColor(c.fill)}
-            aria-label={`${c.name} pen`}
-            aria-pressed={activeColor === c.fill}
-            className={`h-9 w-9 rounded-full border-2 ${
-              activeColor === c.fill ? "border-pitch" : "border-stone-200"
-            }`}
-            style={{ backgroundColor: c.fill }}
-          />
-        ))}
-      </div>
-      <div className="flex items-center gap-1.5 pl-2">
-        {PEN_WIDTHS.map((w) => (
-          <button
-            key={w.label}
-            onClick={() => onWidth(w.width)}
-            aria-pressed={activeWidth === w.width}
-            className={`flex min-h-[36px] items-center gap-1.5 rounded-full border px-2.5 text-xs font-semibold ${
-              activeWidth === w.width
-                ? "border-pitch bg-pitch text-white"
-                : "border-stone-300 bg-white text-stone-600"
-            }`}
-          >
-            <svg viewBox="0 0 20 8" className="h-2 w-5">
-              <line x1={2} y1={4} x2={18} y2={4} stroke="currentColor" strokeWidth={w.width * 2.2} strokeLinecap="round" />
-            </svg>
-            {w.label}
-          </button>
-        ))}
-      </div>
-    </div>
   );
 
   const hint = (
@@ -1973,42 +1286,7 @@ export default function BoardEditorPage() {
     </div>
   ) : null;
 
-  const rolesInUse = PLAYER_ROLES.filter((r) =>
-    board.tokens.some((t) => t.type === "player" && t.role === r.role)
-  );
-  const legend = (
-    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-stone-500">
-      {rolesInUse.map((r) => (
-        <span key={r.role} className="flex items-center gap-1.5">
-          <span
-            aria-hidden
-            className="inline-block h-3 w-3 rounded-full"
-            style={{ background: r.fill, border: `1px solid ${r.stroke}` }}
-          />
-          {r.label}
-        </span>
-      ))}
-      {MOVEMENT_TYPES.map((m) => (
-        <span key={m} className="flex items-center gap-1.5">
-          <svg viewBox="0 0 24 8" className="h-2.5 w-7 rounded-sm bg-stone-100 ring-1 ring-stone-200">
-            <line
-              x1={2}
-              y1={4}
-              x2={22}
-              y2={4}
-              stroke={MOVEMENT_STYLE[m].color}
-              strokeWidth={2}
-              strokeDasharray={MOVEMENT_STYLE[m].dash
-                ?.split(" ")
-                .map((n) => Number(n) * 1.8)
-                .join(" ")}
-            />
-          </svg>
-          {MOVEMENT_STYLE[m].label}
-        </span>
-      ))}
-    </div>
-  );
+  const legend = <BoardLegend tokens={board.tokens} />;
 
   // a red round × the coach taps to delete the selected item; it sits clear
   // of the item and only fires on release, so grabbing the item to drag it
@@ -2326,53 +1604,17 @@ export default function BoardEditorPage() {
 
   const viewBoxStr = `${view.x} ${view.y} ${view.w} ${view.h}`;
   const zoomedIn = zoomView != null && view.w < baseView.w - 0.01;
-  const zoomedOut = zoomView == null;
-  const zoomedMax = view.w <= baseView.w / MAX_ZOOM + 0.001;
-  const zoomBtn =
-    "flex h-10 w-10 items-center justify-center rounded-lg bg-black/55 text-lg font-bold text-white shadow disabled:opacity-30";
   const zoomControls = (
-    // top-right, not bottom: the foot of a tall board sits under the fixed
-    // nav until you scroll, and zoom controls you have to go looking for
-    // are no use
-    <div className="absolute right-2 top-2 z-10 flex flex-col items-end gap-1">
-      <button
-        onClick={() => zoomToWidth(view.w / ZOOM_STEP)}
-        disabled={zoomedMax}
-        aria-label="Zoom in"
-        title="Zoom in (+, or Ctrl and the wheel)"
-        className={zoomBtn}
-      >
-        +
-      </button>
-      <button
-        onClick={() => zoomToWidth(view.w * ZOOM_STEP)}
-        disabled={zoomedOut}
-        aria-label="Zoom out"
-        title="Zoom out (−)"
-        className={zoomBtn}
-      >
-        −
-      </button>
-      {zoomedIn && (
-        <>
-          <button
-            onClick={() => setPanMode((v) => !v)}
-            aria-pressed={panMode}
-            aria-label="Move around the board"
-            title="Drag to move around (or scroll, arrow keys, middle-button drag, two fingers)"
-            className={`${zoomBtn} ${panMode ? "!bg-pitch" : ""}`}
-          >
-            ✋
-          </button>
-          <button
-            onClick={() => setZoomView(null)}
-            className="rounded-lg bg-black/55 px-2.5 py-1 text-xs font-semibold text-white shadow"
-          >
-            Reset zoom
-          </button>
-        </>
-      )}
-    </div>
+    <ZoomControls
+      zoomedIn={zoomedIn}
+      atMax={view.w <= baseView.w / MAX_ZOOM + 0.001}
+      atMin={zoomView == null}
+      panMode={panMode}
+      onZoomIn={() => zoomToWidth(view.w / ZOOM_STEP)}
+      onZoomOut={() => zoomToWidth(view.w * ZOOM_STEP)}
+      onTogglePan={() => setPanMode((v) => !v)}
+      onReset={() => setZoomView(null)}
+    />
   );
 
   // How much of the window's width the canvas can have: a wide screen also
@@ -2552,10 +1794,14 @@ export default function BoardEditorPage() {
         <div className="flex flex-1 items-start justify-center gap-4">
           <div className="flex w-[240px] shrink-0 flex-col gap-2">
             <div data-palette className="flex flex-wrap gap-1.5">
-              {paletteButtons}
+              <Palette
+                mode={mode}
+                setMode={setMode}
+                openMenu={openMenu}
+                setOpenMenu={setOpenMenu}
+              />
             </div>
-            {gridRow}
-            {boardSettings}
+            {settingsPanel}
             {optionsRow}
             {selectionBar}
             {hint}
@@ -2572,10 +1818,14 @@ export default function BoardEditorPage() {
       ) : (
         <>
           <div data-palette className="flex flex-wrap gap-1.5">
-            {paletteButtons}
+            <Palette
+                mode={mode}
+                setMode={setMode}
+                openMenu={openMenu}
+                setOpenMenu={setOpenMenu}
+              />
           </div>
-          {gridRow}
-          {boardSettings}
+          {settingsPanel}
           {optionsRow}
           {selectionBar}
           {hint}

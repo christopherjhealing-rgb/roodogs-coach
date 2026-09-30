@@ -109,7 +109,18 @@ Five bottom-nav tabs, components colocated by feature under `app/(tabs)/`:
    label, typing "1" matched chip 1 and emptied the box, so "13" became 3.
    Coordinates are pitch units (0–100 across, 0–`pitchHeight` down —
    140 on a default board), rendering is shared between
-   the editor and list previews via `BoardCanvas.tsx`. The whiteboard uses a
+   the editor and list previews via `BoardCanvas.
+   **Editor layout.** `board/[id]/page.tsx` is the coupled core — pointer
+   handling, selection, hit-testing, undo and the canvas — and the
+   self-contained pieces live in `board/_editor/` (underscore = kept out of
+   routing): `editorConstants.ts` (modes, selection helpers, tool lists,
+   `gridPoint`), `useBoardZoom.ts` (all zoom/pan state, the frame maths, the
+   wheel and resize effects), `Palette.tsx` (the toolbar), `OptionRows.tsx`
+   (colour / shape / number / sequence / role / pen rows — pure functions of
+   their arguments), `BoardSettings.tsx` (grid chips and the size panel —
+   display only, behaviour arrives as callbacks), `ZoomControls.tsx` and
+   `BoardLegend.tsx`. New behaviour goes in the page or the hook; new
+   controls go in `_editor/`.tsx`. The whiteboard uses a
    **light tactical-board aesthetic matched to the drill diagrams** (off-white
    surface with a dashed green boundary, seal-green player discs with white
    numbers, red defender discs, brass-orange triangle cones, dark-ink runs and
