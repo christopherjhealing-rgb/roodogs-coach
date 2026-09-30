@@ -119,6 +119,10 @@ interface Snapshot {
   tokens: BoardToken[];
   movements: BoardMovement[];
   measures: BoardMeasure[];
+  // the board's shape and icon size are undoable too
+  widthM?: number;
+  lengthM?: number;
+  iconScale?: number;
 }
 
 type Pt = { x: number; y: number };
@@ -151,6 +155,10 @@ export default function BoardEditorPage() {
   // null = automatic numbering (next free number); otherwise the label to
   // put on the next player — a number, or a position like "SH"
   const [playerLabel, setPlayerLabel] = useState<string | null>(null);
+  // What's in the "Other" box. Kept as its own string rather than derived
+  // from the label: derived, typing "1" (a chip number) emptied the box, so
+  // "13" came out as player 3.
+  const [otherDraft, setOtherDraft] = useState("");
   // pen style
   const [penColor, setPenColor] = useState(MOVEMENT_STYLE.draw.color);
   const [penWidth, setPenWidth] = useState(PEN_WIDTHS[1].width);
@@ -181,6 +189,20 @@ export default function BoardEditorPage() {
   const [selected, setSelected] = useState<Selection | null>(null);
 
   const svgRef = useRef<SVGSVGElement | null>(null);
+
+  const solePlayerId =
+    selected && selCount(selected) === 1 && selected.tokens.length === 1
+      ? selected.tokens[0]
+      : null;
+  useEffect(() => {
+    const typed = (l?: string | null) =>
+      l && !PLAYER_NUMBERS.includes(Number(l)) ? l : "";
+    const t = solePlayerId
+      ? board?.tokens.find((x) => x.id === solePlayerId)
+      : undefined;
+    setOtherDraft(t?.type === "player" ? typed(t.label) : typed(playerLabel));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [solePlayerId]);
   // drag of the current selection (tokens, arrows, measures) as a group
   const drag = useRef<{
     sel: Selection;
@@ -190,6 +212,8 @@ export default function BoardEditorPage() {
     measureOrigins: Map<string, { a: Pt; b: Pt }>;
   } | null>(null);
   const dragUndoTaken = useRef(false);
+  // the size boxes push one undo step per edit, not per keystroke
+  const sizeUndoTaken = useRef(false);
   // dragging one end of a selected arrow to resize it
   const resize = useRef<{
     id: string;
@@ -387,7 +411,30 @@ export default function BoardEditorPage() {
     }
   }
 
+  // A board updated on screen but not yet written to storage — see stage().
+  const pendingWrite = useRef<Board | null>(null);
+
+  /** Update the board on screen only; the storage write waits for flush().
+   *  Used while a finger is moving, so a drag isn't a full rewrite of every
+   *  board in storage — plus a sync push — on each pointer event. */
+  function stage(updated: Board) {
+    const stamped = { ...updated, updatedMs: Date.now() };
+    setBoard(stamped);
+    pendingWrite.current = stamped;
+  }
+
+  function flush() {
+    const b = pendingWrite.current;
+    if (!b) return;
+    pendingWrite.current = null;
+    storage.setBoards(storage.getBoards().map((x) => (x.id === b.id ? b : x)));
+  }
+
+  // leaving the page mid-drag still saves the drag
+  useEffect(() => () => flush(), []); // eslint-disable-line react-hooks/exhaustive-deps
+
   function persist(updated: Board) {
+    pendingWrite.current = null;
     const stamped = { ...updated, updatedMs: Date.now() };
     setBoard(stamped);
     storage.setBoards(
@@ -411,6 +458,9 @@ export default function BoardEditorPage() {
           a: { ...m.a },
           b: { ...m.b },
         })),
+        widthM: board.widthM,
+        lengthM: board.lengthM,
+        iconScale: board.iconScale,
       },
     ]);
   }
@@ -516,12 +566,19 @@ export default function BoardEditorPage() {
     if (!board || undoStack.length === 0) return;
     const last = undoStack[undoStack.length - 1];
     setUndoStack((prev) => prev.slice(0, -1));
-    persist({
+    const restored = {
       ...board,
       tokens: last.tokens,
       movements: last.movements,
       measures: last.measures,
-    });
+      widthM: last.widthM,
+      lengthM: last.lengthM,
+      iconScale: last.iconScale,
+    };
+    persist(restored);
+    // keep the size boxes showing what the board now is
+    setWidthStr(String(boardWidthM(restored)));
+    setLengthStr(String(Math.round(boardLengthM(restored))));
     setSelected(null);
   }
 
@@ -777,6 +834,10 @@ export default function BoardEditorPage() {
     pointers.current.delete(e.pointerId);
     if (pointers.current.size < 2) pinch.current = null;
     panDrag.current = null;
+    // a cancelled drag keeps where it got to, like a released one
+    resize.current = null;
+    drag.current = null;
+    flush();
   }
 
   function nextAutoNumber(tokens: BoardToken[]): number {
@@ -898,7 +959,7 @@ export default function BoardEditorPage() {
         snap && board.movements.find((m) => m.id === r.id)?.type !== "draw"
           ? gridPoint(p, stepU, H)
           : p;
-      persist({
+      stage({
         ...board,
         movements: board.movements.map((m) =>
           m.id === r.id
@@ -924,7 +985,7 @@ export default function BoardEditorPage() {
       // so everything keeps its relative layout
       const sdx = snapStep ? snapToGrid(dx, snapStep) : dx;
       const sdy = snapStep ? snapToGrid(dy, snapStep) : dy;
-      persist({
+      stage({
         ...board,
         tokens: board.tokens.map((t) => {
           const o = d.tokenOrigins.get(t.id);
@@ -999,10 +1060,12 @@ export default function BoardEditorPage() {
     }
     if (resize.current) {
       resize.current = null;
+      flush();
       return;
     }
     if (drag.current) {
       drag.current = null;
+      flush();
       return;
     }
     if (marqueeStart.current && mode.kind === "move" && board) {
@@ -1437,6 +1500,11 @@ export default function BoardEditorPage() {
     // 2 m is the narrowest real setup (the 2 m × 15 m drop-and-pop channel),
     // so the floor has to sit below it
     if (w < 2 || w > 200 || l < 2 || l > 300) return;
+    // one undo step per edit, not one per digit typed
+    if (!sizeUndoTaken.current) {
+      pushUndo();
+      sizeUndoTaken.current = true;
+    }
     persist({ ...board, widthM: w, lengthM: l });
   }
 
@@ -1449,6 +1517,9 @@ export default function BoardEditorPage() {
     <input
       inputMode="numeric"
       value={value}
+      onFocus={() => {
+        sizeUndoTaken.current = false;
+      }}
       onChange={(e) => {
         const v = e.target.value.replace(/\D/g, "").slice(0, 3);
         setValue(v);
@@ -1500,7 +1571,7 @@ export default function BoardEditorPage() {
         {ICON_SIZES.map((sz) => (
           <button
             key={sz.label}
-            onClick={() => board && persist({ ...board, iconScale: sz.scale })}
+            onClick={() => commit(() => ({ iconScale: sz.scale }))}
             aria-pressed={iconScale === sz.scale}
             aria-label={`${sz.label} icons`}
             className={`min-h-[36px] rounded-full border px-2.5 font-semibold ${
@@ -1572,10 +1643,6 @@ export default function BoardEditorPage() {
       </div>
     </div>
   );
-
-  /** A label is "typed" when it isn't one of the number chips. */
-  const isTyped = (label: string | null | undefined) =>
-    !!label && !PLAYER_NUMBERS.includes(Number(label));
 
   const roleRow = (
     active: PlayerRole | undefined,
@@ -1766,16 +1833,25 @@ export default function BoardEditorPage() {
       <div className="flex flex-col gap-1.5">
         {numberRow(
           (n) => st.label === String(n),
-          (n) => relabelSelectedPlayer(String(n)),
+          (n) => {
+            relabelSelectedPlayer(String(n));
+            setOtherDraft("");
+          },
           <button
-            onClick={() => relabelSelectedPlayer(undefined)}
+            onClick={() => {
+              relabelSelectedPlayer(undefined);
+              setOtherDraft("");
+            }}
             aria-label="No number"
             className="min-h-[36px] rounded-full border border-stone-300 bg-white px-2.5 text-xs font-medium text-stone-500"
           >
             None
           </button>,
-          isTyped(st.label) ? st.label! : "",
-          (label) => relabelSelectedPlayer(label || undefined)
+          otherDraft,
+          (label) => {
+            setOtherDraft(label);
+            relabelSelectedPlayer(label || undefined);
+          }
         )}
         {seqRow(st.seq, (seq) => setSelectedPlayerSeq(seq))}
         {roleRow(st.role, (role) => setSelectedPlayerRole(role))}
@@ -1825,9 +1901,15 @@ export default function BoardEditorPage() {
       <div className="flex flex-col gap-1.5">
         {numberRow(
           (n) => playerLabel === String(n),
-          (n) => setPlayerLabel(String(n)),
+          (n) => {
+            setPlayerLabel(String(n));
+            setOtherDraft("");
+          },
           <button
-            onClick={() => setPlayerLabel(null)}
+            onClick={() => {
+              setPlayerLabel(null);
+              setOtherDraft("");
+            }}
             aria-pressed={playerLabel === null}
             className={`min-h-[36px] rounded-full border px-2.5 text-xs font-semibold ${
               playerLabel === null
@@ -1837,8 +1919,11 @@ export default function BoardEditorPage() {
           >
             Auto
           </button>,
-          isTyped(playerLabel) ? playerLabel! : "",
-          (label) => setPlayerLabel(label || null)
+          otherDraft,
+          (label) => {
+            setOtherDraft(label);
+            setPlayerLabel(label || null);
+          }
         )}
       </div>
     );
@@ -2216,7 +2301,8 @@ export default function BoardEditorPage() {
             {/* mouse-only hover ring (see globals.css) */}
             <circle
               className="hover-ring"
-              r={tokenHitR * 0.87}
+              // outside the drawn icon even when the catchment is icon-sized
+              r={Math.max(4.6 * iconScale, tokenHitR * 0.87)}
               fill="none"
               stroke="#1E5B3C"
               strokeWidth={0.5}

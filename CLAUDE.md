@@ -96,6 +96,17 @@ Five bottom-nav tabs, components colocated by feature under `app/(tabs)/`:
    `draw`: a plain line, no arrowhead, never grid-locked, and excluded from the
    Play animation). A drill can link one board via
    `boardId` and shows its thumbnail on the drill card.
+   Outside the editor (board-list thumbnails, drill viewer, Present mode,
+   grid tiles) a board is never drawn taller than `PREVIEW_MAX_RATIO`
+   (1.6:1, `previewAspect`); past that it sits centred and narrower, so a
+   3 m × 20 m channel no longer runs ~1,700px down the page. While a finger
+   is dragging or resizing, the editor updates the screen only (`stage`) and
+   writes storage once on release (`flush`, also on cancel and unmount) —
+   not a full rewrite of every board, plus a sync push, per pointer event.
+   Undo covers the board's size and icon size as well as its contents; the
+   size boxes push one undo step per edit, not per keystroke. The typed
+   "Other" label box keeps its own string (`otherDraft`) — derived from the
+   label, typing "1" matched chip 1 and emptied the box, so "13" became 3.
    Coordinates are pitch units (0–100 across, 0–`pitchHeight` down —
    140 on a default board), rendering is shared between
    the editor and list previews via `BoardCanvas.tsx`. The whiteboard uses a

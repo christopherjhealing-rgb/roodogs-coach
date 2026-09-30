@@ -56,6 +56,17 @@ function badgesFor(
   return badges;
 }
 
+/** Stat columns after Player, in order: full header and a phone-width one. */
+const STAT_COLUMNS: { key: string; full: string; short: string }[] = [
+  { key: "games", full: "Games", short: "Gms" },
+  { key: "time", full: "Time", short: "Time" },
+  { key: "tries", full: "Tries", short: "Tries" },
+  { key: "tackles", full: "Tackles", short: "Tkl" },
+  { key: "steals", full: "Steals", short: "Stl" },
+  { key: "lost", full: "Lost", short: "Lost" },
+  { key: "trainings", full: "Training", short: "Trn" },
+];
+
 export default function StatsPage() {
   const [rows, setRows] = useState<PlayerSeason[]>([]);
   const [matchCount, setMatchCount] = useState(0);
@@ -243,52 +254,62 @@ export default function StatsPage() {
                   Tackle machine
                 </div>
                 <div className="text-lg font-bold">{topTackles.name}</div>
-                <div className="text-sm">{topTackles.tackles} tackles</div>
+                <div className="text-sm">
+                  {topTackles.tackles}{" "}
+                  {topTackles.tackles === 1 ? "tackle" : "tackles"}
+                </div>
               </div>
             )}
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          {/* Fits a phone: nothing wraps, headers shorten below sm (the full
+              word is in the tooltip and the key underneath), and the name
+              column stays put if the table ever does scroll sideways. */}
+          <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+            <table className="w-full whitespace-nowrap text-[13px] sm:text-sm">
               <thead>
-                <tr className="border-b border-stone-200 text-left text-xs uppercase tracking-wide text-stone-400">
-                  <th className="py-2 font-semibold">Player</th>
-                  <th className="py-2 text-right font-semibold">Games</th>
-                  <th className="py-2 text-right font-semibold">Time</th>
-                  <th className="py-2 text-right font-semibold">Tries</th>
-                  <th className="py-2 text-right font-semibold">Tackles</th>
-                  <th className="py-2 text-right font-semibold">Steals</th>
-                  <th className="py-2 text-right font-semibold">Lost</th>
-                  <th className="py-2 text-right font-semibold">Training</th>
+                <tr className="border-b border-stone-200 text-left text-[11px] uppercase tracking-wide text-stone-400 sm:text-xs">
+                  <th className="sticky left-0 bg-stone-100 py-2 pr-2 font-semibold">Player</th>
+                  {STAT_COLUMNS.map((c) => (
+                    <th key={c.key} title={c.full} className="py-2 pl-2 text-right font-semibold">
+                      <span className="sm:hidden">{c.short}</span>
+                      <span className="hidden sm:inline">{c.full}</span>
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.id} className="border-b border-stone-100">
-                    <td className="py-2 font-medium">{r.name}</td>
-                    <td className="py-2 text-right tabular-nums">{r.games}</td>
-                    <td className="py-2 text-right tabular-nums">
+                    <td className="sticky left-0 bg-stone-100 py-2 pr-2 font-medium">{r.name}</td>
+                    <td className="py-2 pl-2 text-right tabular-nums">{r.games}</td>
+                    <td className="py-2 pl-2 text-right tabular-nums">
                       {formatMins(r.timeMs)}
                     </td>
-                    <td className="py-2 text-right tabular-nums">
+                    <td className="py-2 pl-2 text-right tabular-nums">
                       {r.tries || "–"}
                     </td>
-                    <td className="py-2 text-right tabular-nums">
+                    <td className="py-2 pl-2 text-right tabular-nums">
                       {r.tackles || "–"}
                     </td>
-                    <td className="py-2 text-right tabular-nums">
+                    <td className="py-2 pl-2 text-right tabular-nums">
                       {r.steals || "–"}
                     </td>
-                    <td className="py-2 text-right tabular-nums">
+                    <td className="py-2 pl-2 text-right tabular-nums">
                       {r.lost || "–"}
                     </td>
-                    <td className="py-2 text-right tabular-nums">
+                    <td className="py-2 pl-2 text-right tabular-nums">
                       {r.trainings || "–"}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            <p className="pt-1.5 text-[11px] text-stone-400 sm:hidden">
+              {STAT_COLUMNS.filter((c) => c.short !== c.full)
+                .map((c) => `${c.short} ${c.full.toLowerCase()}`)
+                .join(" · ")}
+            </p>
           </div>
 
           {highlights.length > 0 && (

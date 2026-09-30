@@ -8,6 +8,12 @@ export const metadata: Metadata = {
   title: "Roodogs Coach",
   description: "Coaching companion for the Wanneroo Roodogs Under 9s",
   manifest: "/manifest.webmanifest",
+  // Without this the page declared no icon, so desktop browser tabs showed
+  // none and fell back to requesting /favicon.ico (now also present).
+  icons: {
+    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
+    apple: "/apple-icon.png",
+  },
 };
 
 export const viewport: Viewport = {

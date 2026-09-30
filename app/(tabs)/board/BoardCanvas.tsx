@@ -230,6 +230,21 @@ export function pitchHeight(b: Sized): number {
   return Math.max(20, Math.min(2000, Math.round(h * 10) / 10));
 }
 
+/**
+ * Tallest a board is ever drawn outside the editor, as height ÷ width. A
+ * 3 m × 20 m channel is 6.7:1 — drawn at full width in a list card or in
+ * Present mode it ran ~1,700px down the page and pushed "Next drill" off the
+ * screen. Past this ratio the drawing box stops growing and the board sits
+ * centred in it, narrower; the default 1.4:1 board is unaffected.
+ */
+export const PREVIEW_MAX_RATIO = 1.6;
+
+/** CSS aspect-ratio for a board drawn outside the editor, capped. */
+export function previewAspect(b: Sized): string {
+  const ratio = Math.min(pitchHeight(b) / PITCH_W, PREVIEW_MAX_RATIO);
+  return `${PITCH_W} / ${Math.round(PITCH_W * ratio * 10) / 10}`;
+}
+
 /** Token size multiplier for a board (1 = standard). */
 export function iconScaleOf(b: Sized): number {
   const s = b.iconScale;
@@ -684,6 +699,7 @@ export function BoardPreview({
     <svg
       viewBox={`0 0 ${PITCH_W} ${pitchHeight(board)}`}
       className={className}
+      style={{ aspectRatio: previewAspect(board) }}
       role="img"
       aria-label={`Diagram: ${board.name}`}
     >

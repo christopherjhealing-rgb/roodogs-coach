@@ -12,6 +12,7 @@ import {
   iconScaleOf,
   pitchHeight,
   playerRepeatIndex,
+  previewAspect,
   surfaceFor,
 } from "./BoardCanvas";
 import { canPlay as boardCanPlay, runSequentialPlay } from "./boardPlay";
@@ -55,6 +56,7 @@ export default function AnimatedBoard({
       <svg
         viewBox={`0 0 ${PITCH_W} ${h}`}
         className="w-full rounded-xl"
+        style={{ aspectRatio: previewAspect(board) }}
         role="img"
         aria-label={`Diagram: ${board.name}`}
       >
